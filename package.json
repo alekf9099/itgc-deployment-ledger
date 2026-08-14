@@ -14,5 +14,9 @@
   },
   "dependencies": {
     "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "ws": "^8.21.3"
   }
 }

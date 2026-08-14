@@ -19,7 +19,7 @@
  */
 import { randomBytes, scrypt as _scrypt } from 'node:crypto';
 import { promisify } from 'node:util';
-import pg from 'pg';
+import { connect } from './_client.mjs';
 
 const scrypt = promisify(_scrypt);
 
@@ -34,12 +34,6 @@ if (!['admin', 'member', 'viewer'].includes(role)) {
   process.exit(1);
 }
 
-const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
-if (!connectionString) {
-  console.error('POSTGRES_URL 또는 DATABASE_URL 환경변수를 설정하십시오.');
-  process.exit(1);
-}
-
 /* 사람이 옮겨 적을 수 있도록 혼동되는 글자(0/O, 1/l/I)를 뺀 문자집합을 씁니다. */
 const ALPHABET = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const password = Array.from(randomBytes(16))
@@ -50,8 +44,7 @@ const salt = randomBytes(16).toString('hex');
 const key = await scrypt(password, salt, 64);
 const hash = `scrypt$${salt}$${key.toString('hex')}`;
 
-const client = new pg.Client({ connectionString, ssl: { rejectUnauthorized: false } });
-await client.connect();
+const client = await connect();
 try {
   const { rows } = await client.query(
     `INSERT INTO users (username, name, unit, role, password_hash)

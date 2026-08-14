@@ -8,25 +8,12 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import pg from 'pg';
+import { connect } from './_client.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const sql = readFileSync(join(here, '..', 'db', 'schema.sql'), 'utf8');
 
-const connectionString =
-  process.env.POSTGRES_URL || process.env.DATABASE_URL;
-
-if (!connectionString) {
-  console.error('POSTGRES_URL 또는 DATABASE_URL 환경변수를 설정하십시오.');
-  process.exit(1);
-}
-
-const client = new pg.Client({
-  connectionString,
-  ssl: { rejectUnauthorized: false },
-});
-
-await client.connect();
+const client = await connect();
 try {
   await client.query(sql);
   const { rows } = await client.query(
