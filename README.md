@@ -177,6 +177,18 @@ npx vercel dev
 node scripts/check.mjs
 ```
 
+### 사내망에서 DB 접속이 안 될 때
+
+`migrate` 나 `create-user` 실행 시 `ETIMEDOUT ...:5432` 가 나면 방화벽이 Postgres
+기본 포트를 막고 있는 경우입니다. Neon 호스트라면 스크립트가 자동으로 WebSocket(443)
+경로로 붙으므로 그대로 실행하면 됩니다. 연결 방식은 실행 시 첫 줄에 표시됩니다.
+
+```
+연결: Neon WebSocket (443)
+```
+
+Vercel 에서 실행되는 API 는 이 제약이 없어 별도 조치가 필요하지 않습니다.
+
 ## 버전
 
 `index.html`의 `APP_VERSION` 상수로 관리하며 화면 좌하단에 표시됩니다.
