@@ -238,6 +238,31 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 .users tr.off td.id,.users tr.off td.d{color:var(--ink-3)}
 .st{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px}
 .st.on{background:var(--ok-bg);color:var(--ok)} .st.off{background:var(--line-2);color:var(--ink-3)}
+
+/* ─────────── 공지 ─────────── */
+#notice{display:grid;gap:8px;margin-bottom:18px}
+#notice:empty{display:none}
+.note{display:flex;gap:11px;align-items:flex-start;border-radius:9px;padding:12px 15px;font-size:12.5px;line-height:1.55}
+.note b{font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.04em;
+  padding:2px 8px;border-radius:20px;flex:0 0 auto;margin-top:1px}
+.note.warn{background:var(--warn-bg);color:var(--warn);border:1px solid #EBD9AE}
+.note.warn b{background:#F0DFB4;color:#6E4700}
+.note.critical{background:var(--bad-bg);color:var(--bad);border:1px solid #EFC3C7}
+.note.critical b{background:#F3C9CD;color:#8E1B25}
+.note .go{margin-left:auto;flex:0 0 auto;background:var(--card);border:1px solid currentColor;
+  color:inherit;border-radius:6px;padding:4px 11px;font-size:11.5px;font-weight:600;cursor:pointer;opacity:.85}
+.note .go:hover{opacity:1}
+
+/* ─────────── 저장소 ─────────── */
+.gauge{height:11px;border-radius:6px;background:var(--line-2);overflow:hidden;margin:11px 0 7px}
+.gauge span{display:block;height:100%;border-radius:6px;background:#2FA98D;transition:width .3s}
+.gauge.warn span{background:#D9A430} .gauge.critical span{background:#D2434F}
+.gmeta{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.gmeta b{color:var(--ink-2);font-weight:600}
+.bars{display:grid;gap:6px;font-size:12px}
+.bars>div{display:grid;grid-template-columns:130px 1fr 58px;gap:10px;align-items:center}
+.bars i{height:8px;border-radius:4px;background:#7FA8E8;display:block;min-width:2px;font-style:normal}
+.bars em{font-family:var(--mono);font-size:11px;color:var(--ink-3);font-style:normal;text-align:right}
 @media (max-width:900px){
   body{grid-template-columns:1fr}
   nav{flex-direction:row;overflow-x:auto;padding:10px;align-items:center;gap:4px}
@@ -263,12 +288,16 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
   <button data-v="std"><i>03</i>작성 기준</button>
   <button data-v="log"><i>04</i>변경 이력</button>
   <button data-v="users" id="navUsers" hidden><i>05</i>계정 관리</button>
+  <button data-v="storage"><i>06</i>저장소</button>
   <div class="who"><b id="whoName">—</b><span id="whoRole"></span>
     <div class="links"><button id="pwOpen">비밀번호 변경</button> · <button id="logout">로그아웃</button></div></div>
   <div class="navfoot">통제부서 QA유닛<br>검토부서 TA유닛<br><span id="build">v—</span></div>
 </nav>
 
 <main>
+  <!-- 저장 용량과 증적 반출 주기에 대한 공지. 모든 화면에서 보입니다. -->
+  <div id="notice"></div>
+
   <!-- ══════ 대장 ══════ -->
   <section id="v-ledger">
     <div class="head">
@@ -477,6 +506,51 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
       </table>
     </div>
   </section>
+
+  <!-- ══════ 저장소 ══════ -->
+  <section id="v-storage" hidden>
+    <div class="head">
+      <div>
+        <h1>저장소</h1>
+        <p class="sub">대장은 Neon Postgres에 저장됩니다. 현재 Free 플랜은 용량 한도가 있고 시점 복구 기간이 짧으므로, 대장 화면만으로는 증적을 장기 보존할 수 없습니다. 월 1회 이상 내보내 아카이빙 채널에 보관하십시오.</p>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn ghost" id="stReload">새로고침</button>
+        <button class="btn" id="stExport">전체 대장 내보내기</button>
+      </div>
+    </div>
+
+    <div class="grid" id="stStats"></div>
+
+    <div class="panel">
+      <h3><i>01</i>용량 사용률</h3>
+      <p>Neon이 과금 기준으로 집계하는 용량은 변경 이력(WAL)을 포함하므로 이 값보다 큽니다. 여유를 판단하는 참고치로 사용하고, 정확한 값은 Neon 콘솔에서 확인하십시오.</p>
+      <div class="gauge" id="stGauge"><span style="width:0"></span></div>
+      <div class="gmeta" id="stGmeta"></div>
+    </div>
+
+    <div class="panel">
+      <h3><i>02</i>테이블별 사용량</h3>
+      <p>변경 이력은 기록이 쌓이기만 하므로 시간이 지나면 가장 큰 비중을 차지합니다. 이력은 통제 운영의 증거이므로 임의로 지우지 않고, 용량이 부족해지면 반출 후 플랜 상향을 검토합니다.</p>
+      <table class="chk"><thead><tr>
+        <th>테이블</th><th style="width:110px">행 수</th><th style="width:110px">용량</th><th>비중</th>
+      </tr></thead><tbody id="stTables"></tbody></table>
+    </div>
+
+    <div class="panel">
+      <h3><i>03</i>월별 등록 추이</h3>
+      <p>배포일 기준 등록 건수입니다. 증가 속도로 반출 주기와 플랜 상향 시점을 판단합니다.</p>
+      <div class="bars" id="stTrend"></div>
+    </div>
+
+    <div class="panel">
+      <h3><i>04</i>증적 반출 이력</h3>
+      <p>언제 누가 어떤 범위로 증적을 내보내 보관했는지 기록합니다. 기록 보존 절차를 증명하는 값이므로 대장·점검 결과 CSV를 내보낼 때 자동으로 남습니다.</p>
+      <table class="chk"><thead><tr>
+        <th style="width:150px">일시</th><th style="width:120px">수행자</th><th>범위</th>
+      </tr></thead><tbody id="stExports"></tbody></table>
+    </div>
+  </section>
 </main>
 
 <!-- 인증 확인이 끝날 때까지 대장이 보이지 않도록 기본값을 표시 상태로 둡니다. -->
@@ -590,7 +664,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.1.2';
+const APP_VERSION='2.2.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -787,7 +861,8 @@ async function loadEntryHist(rec){
 }
 const ACT={'entry.create':'등록','entry.update':'수정','entry.delete':'삭제',
   'check.save':'월간 점검 저장','check.delete':'월간 점검 삭제','login':'로그인','password.change':'비밀번호 변경',
-  'user.create':'계정 발급','user.update':'계정 변경','user.reset':'비밀번호 재설정'};
+  'user.create':'계정 발급','user.update':'계정 변경','user.reset':'비밀번호 재설정',
+  'export.ledger':'대장 반출','export.check':'점검 결과 반출','export.backup':'전체 백업 반출'};
 function when(v){
   if(!v) return '';
   const d=new Date(v);
@@ -974,6 +1049,7 @@ function exportCheckCSV(snap){
   a.href=URL.createObjectURL(new Blob([csvEscape(R)],{type:'text/csv'}));
   a.download=`QA-MC-${s.from.slice(0,7)}_월간점검.csv`; a.click();
   toast('점검 결과 CSV를 내보냈습니다');
+  logExport('check',`${s.from}~${s.to}`,s.ledCount);
 }
 async function saveCheck(){
   if(readonly()) return toast('열람 전용 계정입니다');
@@ -1065,6 +1141,7 @@ const OPS=[
  ['계정 및 권한','담당자별 계정으로 접속하며 계정을 공유하지 않습니다. 계정 발급·회수는 QA유닛 책임자가 승인합니다.\n· 관리자 — 계정 관리, 배포 건의 대장 제외, 점검 이력 삭제\n· 작성 권한 — 배포 건 등록·수정, 월간 점검 수행\n· 열람 전용 — 조회만 가능. 통제검토부서와 감사인 계정에 부여합니다.\n인사 이동이나 퇴사 시 계정을 즉시 비활성화하고 그 사실을 점검 기록에 남깁니다.\n계정 발급·권한 변경·비활성화는 「계정 관리」 화면에서 관리자가 수행하며, 모든 조작이 변경 이력에 기록됩니다.\n계정은 삭제하지 않고 비활성화만 합니다. 그 계정이 남긴 변경 이력의 수행자 정보를 보존해야 하기 때문입니다.\n임시 비밀번호는 발급 시 한 번만 표시되며, 최초 로그인 후 본인이 변경합니다.'],
  ['변경 이력','대장의 모든 등록·수정·삭제와 접속이 수행자·일시와 함께 자동 기록되며, 화면에서 수정하거나 삭제할 수 없습니다. 「변경 이력」 화면과 각 배포 건의 편집 화면에서 확인합니다.'],
  ['기록 보존','배포 건은 대장에서 제외해도 기록 자체는 삭제하지 않고 제외 표시만 남깁니다. 흔적 없는 삭제가 가능하면 모집단 완전성을 담보할 수 없기 때문입니다.'],
+ ['증적 반출 및 보관','대장은 작성 도구이며 장기 보존 수단이 아닙니다. 저장소 플랜에 따라 용량 한도와 복구 가능 기간이 제한되므로, 월 1회 이상 CSV로 내보내 아카이빙 채널에 보관합니다.\n반출 시점은 월간 점검과 함께 맞춥니다. 점검 결과 CSV와 대장 CSV를 같은 시점에 보관하면 그 시점의 모집단과 판정이 함께 남습니다.\n반출은 수행자·일시·범위·건수가 변경 이력에 자동 기록됩니다. 범위가 남지 않으면 반출본이 전수인지 일부인지 확인할 수 없습니다.\n「저장소」 화면에서 사용량과 최근 반출 시점을 확인하며, 한도에 근접하거나 반출 주기를 넘기면 전 화면 상단에 공지가 표시됩니다.'],
 ];
 function renderStd(){
   const acc=(el,arr)=>$(el).innerHTML=arr.map(([t,d])=>
@@ -1079,8 +1156,9 @@ const CSVH=['증적 문서 ID','배포일','릴리즈 구분','유형 판정자'
  '변경 작성자','검증 수행자','QA 판정','배포 승인자','배포 승인일','스키마·데이터 변경','정합성 검증',
  '정합성 검증자','증적 등록일','증적 등록 경로','증적 상태','등록 기한','기한 준수','직무 분리',
  '승인 기록','증적 매핑','정합성 확인','ID 정합성','종합 판정','예외 승인자','비고'];
-function exportCSV(){
-  const rows=filtered().map(r=>{
+/* 내보내기는 증적 반출에 해당하므로 범위와 건수를 이력에 남깁니다. */
+function exportRows(list,filename,kind,scope){
+  const rows=list.map(r=>{
     const v=judge(r);
     const L=k=>v[k]?(LABEL[k][v[k]]||''):'';
     return [r.id,r.date,r.type,r.judge,r.sys,r.task,r.dev,r.qa,r.qav,r.appr,r.apprd,
@@ -1090,8 +1168,25 @@ function exportCSV(){
   const csv='\uFEFF'+[CSVH,...rows].map(r=>r.map(c=>`"${(c??'').toString().replace(/"/g,'""')}"`).join(',')).join('\r\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-  a.download=`배포관리대장_${fmt(new Date())}.csv`; a.click();
+  a.download=filename; a.click();
   toast('CSV를 내보냈습니다');
+  logExport(kind,scope,list.length);
+}
+
+/* 어떤 조건으로 뽑은 자료인지 남기지 않으면 반출본이 전수인지 일부인지 알 수 없습니다. */
+function filterScope(){
+  const p=[];
+  if($('q').value.trim()) p.push(`검색 "${$('q').value.trim()}"`);
+  if($('fType').value) p.push(`유형 ${$('fType').value}`);
+  if($('fVerdict').value) p.push(`판정 ${$('fVerdict').value}`);
+  if($('fFrom').value||$('fTo').value) p.push(`배포일 ${$('fFrom').value||'전체'}~${$('fTo').value||'전체'}`);
+  return p.length?p.join(' · '):'전체 (필터 없음)';
+}
+
+function exportCSV(){
+  const list=filtered();
+  if(!list.length) return toast('내보낼 배포 건이 없습니다');
+  exportRows(list,`배포관리대장_${fmt(new Date())}.csv`,'ledger',filterScope());
 }
 
 /* ══════════════ 변경 이력 화면 ══════════════ */
@@ -1130,6 +1225,104 @@ function renderLog(){
     <td class="w"><div class="ch">${changeHTML(l.changed)||'<span style="color:var(--ink-3)">—</span>'}</div></td>
   </tr>`).join('');
 }
+
+/* ══════════════ 저장소 ══════════════ */
+let STORE=null;
+const KB=1024, MB=KB*1024;
+function bytes(n){
+  if(n==null) return '—';
+  if(n>=MB) return (n/MB).toFixed(n/MB>=10?0:1)+' MB';
+  if(n>=KB) return Math.round(n/KB)+' KB';
+  return n+' B';
+}
+
+async function loadStorage(){
+  try{
+    STORE=await api('/api/storage');
+    renderStorage(); renderNotice();
+  }catch(e){
+    $('stTables').innerHTML=`<tr><td colspan="4" style="color:var(--bad)">사용량을 불러오지 못했습니다. ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function renderNotice(){
+  const box=$('notice');
+  if(!STORE||!STORE.notices.length){ box.innerHTML=''; return; }
+  box.innerHTML=STORE.notices.map(n=>`<div class="note ${n.level}">
+    <b>${n.level==='critical'?'조치 필요':'확인'}</b>
+    <span>${esc(n.text)}</span>
+    <button class="go" data-goto="storage">저장소 보기</button>
+  </div>`).join('');
+}
+$('notice').addEventListener('click',e=>{
+  if(e.target.dataset.goto) document.querySelector('nav button[data-v="storage"]').click();
+});
+
+function renderStorage(){
+  const s=STORE; if(!s) return;
+  const level=s.pct>=85?'critical':s.pct>=70?'warn':'';
+  const last=s.lastExport;
+
+  $('stStats').innerHTML=`
+    <div class="stat ${level==='critical'?'hot':level==='warn'?'':'good'}">
+      <label>사용 용량</label><b>${s.pct}</b><small>% · ${bytes(s.used)} / ${bytes(s.limit)}</small></div>
+    <div class="stat"><label>배포 건</label><b>${(s.tables.find(t=>t.name==='entries')||{}).rows??0}</b><small>건 기재</small></div>
+    <div class="stat"><label>추가 여유 (추정)</label><b>${s.headroom==null?'—':s.headroom.toLocaleString()}</b>
+      <small>${s.perEntry?`건 · 건당 약 ${bytes(s.perEntry)}`:'건 등록 후 산출'}</small></div>
+    <div class="stat ${last&&last.daysSince<=s.cycleDays?'good':'hot'}">
+      <label>최근 증적 반출</label><b>${last?last.daysSince:'—'}</b>
+      <small>${last?`일 전 · ${esc(last.by||'')}`:'반출 기록 없음'}</small></div>`;
+
+  const g=$('stGauge');
+  g.className='gauge'+(level?' '+level:'');
+  g.firstElementChild.style.width=Math.max(s.pct,0.5)+'%';
+  $('stGmeta').innerHTML=`<span><b>${bytes(s.used)}</b> 사용</span>
+    <span>한도 <b>${bytes(s.limit)}</b> · 남음 ${bytes(Math.max(0,s.limit-s.used))}</span>`;
+
+  const max=Math.max(...s.tables.map(t=>t.bytes),1);
+  $('stTables').innerHTML=s.tables.map(t=>`<tr>
+    <td>${esc(t.label)}<br><span style="font-family:var(--mono);font-size:10.5px;color:var(--ink-3)">${esc(t.name)}</span></td>
+    <td class="c">${t.rows.toLocaleString()}</td>
+    <td class="c">${bytes(t.bytes)}</td>
+    <td><div style="background:var(--line-2);border-radius:4px;height:8px;max-width:280px">
+      <div style="width:${Math.max(2,Math.round(t.bytes/max*100))}%;height:8px;border-radius:4px;background:#7FA8E8"></div></div></td>
+  </tr>`).join('');
+
+  const tmax=Math.max(...s.trend.map(t=>t.rows),1);
+  $('stTrend').innerHTML=s.trend.length
+    ? s.trend.map(t=>`<div><span>${esc(t.month)}</span>
+        <i style="width:${Math.max(2,Math.round(t.rows/tmax*100))}%"></i><em>${t.rows}건</em></div>`).join('')
+    : '<div style="color:var(--ink-3)">등록된 배포 건이 없습니다.</div>';
+}
+
+/* 반출 이력은 변경 이력에서 export.* 기록만 뽑아 보여줍니다. */
+async function loadExports(){
+  const tb=$('stExports');
+  try{
+    const {log}=await api('/api/audit?limit=500');
+    const list=log.filter(l=>l.action.startsWith('export.'));
+    tb.innerHTML=list.length
+      ? list.slice(0,30).map(l=>`<tr>
+          <td class="c" style="font-family:var(--mono);font-size:11.5px">${esc(when(l.at))}</td>
+          <td>${esc(l.actor_name||l.actor)}</td><td>${esc(l.note||'')}</td></tr>`).join('')
+      : `<tr><td colspan="3" style="color:var(--ink-3)">반출 기록이 없습니다. 대장을 내보내면 자동으로 기록됩니다.</td></tr>`;
+  }catch(e){
+    tb.innerHTML=`<tr><td colspan="3" style="color:var(--bad)">이력을 불러오지 못했습니다.</td></tr>`;
+  }
+}
+
+/* 반출 기록. 실패해도 내보내기 자체는 막지 않습니다. */
+async function logExport(kind,scope,count){
+  try{ await api('/api/storage',{method:'POST',body:{action:'log-export',kind,scope,count}}); }
+  catch(e){ console.error(e); }
+}
+
+$('stReload').onclick=()=>{ loadStorage(); loadExports(); };
+$('stExport').onclick=()=>{
+  if(!DATA.length) return toast('내보낼 배포 건이 없습니다');
+  exportRows(DATA,`배포관리대장_전체_${fmt(new Date())}.csv`,'backup','전체');
+  setTimeout(()=>{ loadStorage(); loadExports(); },800);
+};
 
 /* ══════════════ 비밀번호 변경 ══════════════ */
 function pwOpen(){
@@ -1268,7 +1461,7 @@ $('uRows').addEventListener('click',async e=>{
 });
 
 /* ══════════════ 부팅 ══════════════ */
-const VIEWS={ledger:'v-ledger',check:'v-check',std:'std',log:'v-log',users:'v-users'};
+const VIEWS={ledger:'v-ledger',check:'v-check',std:'std',log:'v-log',users:'v-users',storage:'v-storage'};
 document.querySelectorAll('nav button[data-v]').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button[data-v]').forEach(x=>x.setAttribute('aria-current',x===b));
   const v=b.dataset.v;
@@ -1276,6 +1469,7 @@ document.querySelectorAll('nav button[data-v]').forEach(b=>b.onclick=()=>{
   if(v==='check') renderCheck();
   if(v==='log') loadLog();
   if(v==='users') loadUsers();
+  if(v==='storage'){ loadStorage(); loadExports(); }
 });
 /* 계정 관리 화면에서 권한이 낮은 계정으로 바뀌는 경우를 막기 위해, 로그인할 때
    화면을 항상 대장으로 되돌립니다. */
@@ -1346,7 +1540,8 @@ $('loginForm').addEventListener('submit',async e=>{
 
 $('logout').onclick=async()=>{
   try{ await api('/api/auth',{method:'POST',body:{action:'logout'}}); }catch(e){}
-  ME=null; DATA=[]; HIST=[]; CHK={}; LOG=[];
+  ME=null; DATA=[]; HIST=[]; CHK={}; LOG=[]; STORE=null;
+  $('notice').innerHTML='';
   renderLedger(); renderCheck();
   showGate('로그아웃했습니다.');
 };
@@ -1375,6 +1570,9 @@ async function boot(){
   }catch(err){ fail(err); return; }
 
   renderLedger(); renderStd(); renderCheck();
+
+  /* 용량·반출 공지는 로그인을 지연시키지 않도록 뒤이어 불러옵니다. */
+  loadStorage();
 }
 
 (async()=>{
