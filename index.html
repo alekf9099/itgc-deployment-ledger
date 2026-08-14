@@ -174,6 +174,40 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
   padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:.18s;z-index:60
 }
 .toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* ─────────── 로그인 ─────────── */
+.gate{position:fixed;inset:0;background:var(--nav);z-index:80;display:none;place-items:center;padding:20px}
+.gate.on{display:grid}
+.gate form{background:var(--card);border-radius:12px;padding:30px 32px;width:min(370px,100%);box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.gate h2{font-size:17px;margin-bottom:4px}
+.gate p.g{color:var(--ink-3);font-size:11.5px;margin:0 0 22px;line-height:1.6}
+.gate label.f{margin-bottom:13px}
+.gate .btn{width:100%;padding:10px;margin-top:6px}
+.gate .err{background:var(--bad-bg);color:var(--bad);border:1px solid #EFC3C7;border-radius:7px;
+  padding:9px 12px;font-size:12px;margin-bottom:14px;display:none}
+.gate .err.on{display:block}
+.gate .foot{margin-top:18px;padding-top:14px;border-top:1px solid var(--line-2);
+  font-size:10.5px;color:var(--ink-3);font-family:var(--mono);line-height:1.7}
+
+/* ─────────── 사용자 ─────────── */
+.who{padding:0 20px 12px;margin-bottom:2px}
+.who b{display:block;font-size:12.5px;color:#fff;font-weight:600}
+.who span{display:block;font-size:10.5px;color:#8B9BB4;font-family:var(--mono);margin-top:3px}
+.who button{background:none;border:0;color:#8B9BB4;font-size:10.5px;cursor:pointer;padding:5px 0 0;
+  text-decoration:underline;font-family:var(--mono)}
+.who button:hover{color:#fff}
+.ro{background:var(--warn-bg);color:var(--warn);border:1px solid #EBD9AE;border-radius:7px;
+  padding:9px 13px;font-size:12px;margin-bottom:14px}
+
+/* ─────────── 변경 이력 ─────────── */
+.log td.w{white-space:normal}
+.log .ch{font-family:var(--mono);font-size:11px;color:var(--ink-2);line-height:1.7}
+.log .ch b{color:var(--ink);font-weight:600}
+.log .ch s{color:var(--ink-3);text-decoration:line-through}
+.act-tag{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:700;
+  padding:2px 7px;border-radius:20px;background:var(--line-2);color:var(--ink-2)}
+.act-tag.c{background:#E9F1EC;color:#2A6B45} .act-tag.u{background:#E7EDFB;color:#254A9C}
+.act-tag.d{background:var(--bad-bg);color:var(--bad)} .act-tag.l{background:#F2F4F7;color:var(--ink-3)}
 @media (max-width:900px){
   body{grid-template-columns:1fr}
   nav{flex-direction:row;overflow-x:auto;padding:10px;align-items:center;gap:4px}
@@ -190,9 +224,11 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 
 <nav>
   <div class="brand"><b>배포 관리 대장</b><span>ITGC PC-01 / PD-02 · QA유닛</span></div>
+  <div class="who"><b id="whoName">—</b><span id="whoRole"></span><button id="logout">로그아웃</button></div>
   <button data-v="ledger" aria-current="true"><i>01</i>대장</button>
   <button data-v="check"><i>02</i>월간 점검</button>
   <button data-v="std"><i>03</i>작성 기준</button>
+  <button data-v="log"><i>04</i>변경 이력</button>
   <div class="navfoot">통제부서 QA유닛<br>검토부서 TA유닛<br><span id="build">v—</span></div>
 </nav>
 
@@ -321,12 +357,63 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
     </div>
     <div class="panel"><h3><i>04</i>운영 규칙</h3><div class="def" id="defOps" style="border:0"></div></div>
   </section>
+
+  <!-- ══════ 변경 이력 ══════ -->
+  <section id="v-log" hidden>
+    <div class="head">
+      <div>
+        <h1>변경 이력</h1>
+        <p class="sub">대장에 대한 모든 변경과 접속을 기록합니다. 누가·언제·어떤 항목을 어떤 값으로 바꿨는지가 PC-01 변경 통제의 증거입니다. 이 기록은 화면에서 수정하거나 삭제할 수 없습니다.</p>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn ghost" id="logReload">새로고침</button>
+      </div>
+    </div>
+    <div class="bar">
+      <input type="text" id="logQ" placeholder="증적 문서 ID · 담당자 · 항목 검색" style="width:280px">
+      <select id="logAct">
+        <option value="">동작 전체</option>
+        <option value="entry.create">배포 건 등록</option>
+        <option value="entry.update">배포 건 수정</option>
+        <option value="entry.delete">배포 건 삭제</option>
+        <option value="check.save">월간 점검 저장</option>
+        <option value="check.delete">월간 점검 삭제</option>
+        <option value="login">로그인</option>
+        <option value="password.change">비밀번호 변경</option>
+      </select>
+    </div>
+    <div class="tablewrap">
+      <table class="log">
+        <thead><tr>
+          <th style="width:150px">일시</th><th style="width:110px">수행자</th>
+          <th style="width:110px">동작</th><th style="width:170px">대상</th><th>변경 내용</th>
+        </tr></thead>
+        <tbody id="logRows"></tbody>
+      </table>
+    </div>
+  </section>
 </main>
+
+<!-- 인증 확인이 끝날 때까지 대장이 보이지 않도록 기본값을 표시 상태로 둡니다. -->
+<div class="gate on" id="gate">
+  <form id="loginForm" autocomplete="on">
+    <h2>배포 관리 대장</h2>
+    <p class="g">ITGC PC-01 / PD-02 · QA유닛<br>담당자 계정으로 로그인하십시오.</p>
+    <div class="err" id="loginErr"></div>
+    <label class="f"><span>아이디</span>
+      <input type="text" id="lgUser" name="username" autocomplete="username" required></label>
+    <label class="f"><span>비밀번호</span>
+      <input type="password" id="lgPw" name="password" autocomplete="current-password" required></label>
+    <button class="btn" type="submit" id="lgBtn">로그인</button>
+    <div class="foot">이 화면의 모든 입력과 변경은 수행자·일시와 함께 기록됩니다.<br>계정 발급은 QA유닛 책임자에게 요청하십시오.</div>
+  </form>
+</div>
 
 <div class="scrim" id="scrim"></div>
 <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="dTitle">
   <header><h2 id="dTitle">배포 건 추가</h2><button class="btn ghost" id="dClose">닫기</button></header>
   <div class="body">
+    <div class="ro" id="dRo" hidden>열람 전용 계정입니다. 내용을 저장할 수 없습니다.</div>
     <div class="verdict">
       <div class="vh"><b>자동 판정</b><span class="strip" id="dStrip"></span></div>
       <div class="vlist" id="dVerdict"></div>
@@ -384,6 +471,9 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
       </div>
       <div class="row one"><label class="f"><span>비고</span><textarea id="f_memo" rows="2"></textarea></label></div>
     </fieldset>
+    <fieldset class="fs" id="dHistBox" hidden><legend>변경 이력</legend>
+      <div class="ch" id="dHist"></div>
+    </fieldset>
   </div>
   <footer>
     <button class="btn danger" id="dDel" hidden>삭제</button>
@@ -397,26 +487,31 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='1.0.0';
+const APP_VERSION='2.0.0';
 
-/* ══════════════ 저장소 ══════════════ */
-const KEY='qa-ledger-v1', KEY2='qa-check-v1';
-const mem={};
-const store={
-  async get(k){
-    try{ if(window.storage){const r=await window.storage.get(k); return r?JSON.parse(r.value):null;} }catch(e){}
-    try{ const v=localStorage.getItem(k); return v?JSON.parse(v):null; }catch(e){}
-    return mem[k]??null;
-  },
-  async set(k,v){
-    const s=JSON.stringify(v);
-    try{ if(window.storage){await window.storage.set(k,s); return;} }catch(e){}
-    try{ localStorage.setItem(k,s); return; }catch(e){}
-    mem[k]=v;
-  }
-};
+/* ══════════════ 서버 통신 ══════════════ */
+/* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
+   어느 PC에서 접속해도 같은 대장을 보게 되고, 캐시를 지워도 기록은 남습니다. */
+class ApiError extends Error{
+  constructor(msg,status){ super(msg); this.status=status; }
+}
+async function api(path,opt={}){
+  const res=await fetch(path,{
+    credentials:'same-origin',
+    headers:opt.body?{'Content-Type':'application/json'}:{},
+    ...opt,
+    body:opt.body?JSON.stringify(opt.body):undefined
+  });
+  let data=null;
+  try{ data=await res.json(); }catch(e){}
+  if(!res.ok) throw new ApiError(data?.error||`요청에 실패했습니다 (${res.status})`,res.status);
+  return data;
+}
 
-let DATA=[], HIST=[], CHK={}, editing=null;
+let DATA=[], HIST=[], CHK={}, LOG=[], editing=null, ME=null;
+
+/* 열람 전용 계정 여부 */
+const readonly=()=>!ME||ME.role==='viewer';
 
 /* ══════════════ 판정 엔진 ══════════════ */
 const CODE={'정규':'R','수시':'A','핫픽스':'E'};
@@ -550,31 +645,94 @@ function autoId(){
 }
 function openDrawer(rec){
   editing=rec||null;
-  $('dTitle').textContent=rec?'배포 건 편집':'배포 건 추가';
-  $('dDel').hidden=!rec;
-  for(const k in F) $(F[k]).value=rec?(rec[k]||''):'';
+  const ro=readonly();
+  $('dTitle').textContent=rec?(ro?'배포 건 상세':'배포 건 편집'):'배포 건 추가';
+  $('dDel').hidden=!rec||ME?.role!=='admin';
+  $('dSave').hidden=ro;
+  $('dRo').hidden=!ro;
+  for(const k in F){ const el=$(F[k]); el.value=rec?(rec[k]||''):''; el.disabled=ro; }
   if(!rec) $('f_state').value='작성중';
   paintVerdict();
+  $('dHistBox').hidden=!rec;
+  if(rec) loadEntryHist(rec);
   $('scrim').classList.add('on'); $('drawer').classList.add('on');
-  setTimeout(()=>$('f_date').focus(),60);
+  setTimeout(()=>{ if(!ro) $('f_date').focus(); },60);
+}
+
+/* 이 건에 대한 변경 이력을 드로어 하단에 보여줍니다.
+   대장 값만 보면 언제 누가 고쳤는지 알 수 없어, 편집 화면에서 바로 확인하게 합니다. */
+async function loadEntryHist(rec){
+  const box=$('dHist');
+  box.innerHTML='<span style="color:var(--ink-3)">불러오는 중…</span>';
+  const meta=rec._meta||{};
+  const head=[
+    meta.createdBy?`<div>최초 등록 <b>${esc(meta.createdBy)}</b> · ${esc(when(meta.createdAt))}</div>`:'',
+    meta.updatedBy?`<div>최종 수정 <b>${esc(meta.updatedBy)}</b> · ${esc(when(meta.updatedAt))}</div>`:''
+  ].join('');
+  try{
+    const {log}=await api('/api/audit?target='+encodeURIComponent(rec.k));
+    const body=log.length?log.map(l=>`
+      <div style="border-top:1px solid var(--line-2);padding-top:7px;margin-top:7px">
+        ${esc(when(l.at))} · <b>${esc(l.actor_name||l.actor)}</b> · ${esc(ACT[l.action]||l.action)}
+        ${changeHTML(l.changed)}
+      </div>`).join('')
+      :'<div style="color:var(--ink-3);margin-top:7px">기록된 변경이 없습니다.</div>';
+    box.innerHTML=head+body;
+  }catch(e){
+    box.innerHTML=head+'<div style="color:var(--bad);margin-top:7px">이력을 불러오지 못했습니다.</div>';
+  }
+}
+const ACT={'entry.create':'등록','entry.update':'수정','entry.delete':'삭제',
+  'check.save':'월간 점검 저장','check.delete':'월간 점검 삭제','login':'로그인','password.change':'비밀번호 변경'};
+function when(v){
+  if(!v) return '';
+  const d=new Date(v);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function changeHTML(changed){
+  if(!changed||typeof changed!=='object') return '';
+  const rows=Object.entries(changed).map(([field,[a,b]])=>
+    `<div>${esc(field)} <s>${esc(a)||'(공란)'}</s> → <b>${esc(b)||'(공란)'}</b></div>`);
+  return rows.length?`<div style="margin-top:4px">${rows.join('')}</div>`:'';
 }
 function closeDrawer(){ $('scrim').classList.remove('on'); $('drawer').classList.remove('on'); editing=null; }
 
 function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),1900); }
 
 async function save(){
+  if(readonly()) return toast('열람 전용 계정입니다');
   const r=readForm();
   const miss=[];
   if(!r.date) miss.push('배포일'); if(!r.type) miss.push('릴리즈 구분');
   if(!r.sys) miss.push('대상 시스템'); if(!r.judge) miss.push('유형 판정자');
   if(miss.length) return toast(miss.join(', ')+'을 입력하십시오');
-  if(editing){ DATA=DATA.map(x=>x.k===r.k?r:x); } else { DATA.push(r); }
-  await store.set(KEY,DATA); closeDrawer(); renderLedger(); renderCheck(); toast('저장했습니다');
+
+  const btn=$('dSave'); btn.disabled=true;
+  try{
+    const {entry}=await api('/api/entries',{method:'POST',body:r});
+    const i=DATA.findIndex(x=>x.k===entry.k);
+    if(i<0) DATA.push(entry); else DATA[i]=entry;
+    closeDrawer(); renderLedger(); renderCheck(); toast('저장했습니다');
+  }catch(e){ fail(e); }
+  finally{ btn.disabled=false; }
 }
 async function del(){
   if(!editing) return;
-  DATA=DATA.filter(x=>x.k!==editing.k);
-  await store.set(KEY,DATA); closeDrawer(); renderLedger(); renderCheck(); toast('삭제했습니다');
+  if(ME?.role!=='admin') return toast('삭제 권한이 없습니다');
+  const label=editing.id||editing.date||'선택한 건';
+  if(!confirm(`${label} 건을 대장에서 제외합니다.\n\n기록은 변경 이력에 남으며 되돌리려면 관리자가 DB에서 처리해야 합니다. 진행하시겠습니까?`)) return;
+  try{
+    await api('/api/entries?k='+encodeURIComponent(editing.k),{method:'DELETE'});
+    DATA=DATA.filter(x=>x.k!==editing.k);
+    closeDrawer(); renderLedger(); renderCheck(); toast('대장에서 제외했습니다');
+  }catch(e){ fail(e); }
+}
+
+/* 세션이 끊긴 경우와 그 밖의 오류를 구분해 처리합니다. */
+function fail(e){
+  if(e instanceof ApiError && e.status===401){ ME=null; showGate('세션이 만료되었습니다. 다시 로그인하십시오.'); return; }
+  toast(e.message||'요청에 실패했습니다');
+  console.error(e);
 }
 
 /* ══════════════ 월간 점검 ══════════════ */
@@ -714,6 +872,7 @@ function exportCheckCSV(snap){
   toast('점검 결과 CSV를 내보냈습니다');
 }
 async function saveCheck(){
+  if(readonly()) return toast('열람 전용 계정입니다');
   if(!$('cFrom').value||!$('cTo').value) return toast('점검 대상 기간을 입력하십시오');
   if(!$('cDate').value||!$('cBy').value.trim()) return toast('점검 수행일과 점검자를 입력하십시오');
   let defects=0;
@@ -724,11 +883,29 @@ async function saveCheck(){
     const missing=CHECKS.filter(([n,c,k,,d])=>n!=='__split__'&&d&&count(k)>0&&!fixes['fix_'+k]);
     if(missing.length) return toast('지적 항목의 조치 내용을 기재하십시오');
   }
-  const snap=chkSnapshot();
-  HIST.push({id:'h'+Date.now(),pop:snap.ledCount,defects,...snap});
-  CHK={...CHK,...fixes};
-  await store.set(KEY2,{hist:HIST,chk:CHK});
-  renderHist(); toast('점검 결과를 저장했습니다');
+  const btn=$('saveChk'); btn.disabled=true;
+  try{
+    const snap={...chkSnapshot(),defects};
+    const {check}=await api('/api/checks',{method:'POST',body:{snapshot:snap}});
+    HIST.push(check);
+    CHK={...CHK,...fixes};
+    await api('/api/checks',{method:'PATCH',body:{draft:CHK}});
+    renderHist(); toast('점검 결과를 저장했습니다');
+  }catch(e){ fail(e); }
+  finally{ btn.disabled=false; }
+}
+
+/* 조치 내용은 확정 전에도 유실되지 않도록 입력이 멈추면 초안으로 저장합니다. */
+let draftTimer=null;
+function queueDraft(){
+  if(readonly()) return;
+  clearTimeout(draftTimer);
+  draftTimer=setTimeout(async()=>{
+    const fixes={...CHK};
+    document.querySelectorAll('[data-fix]').forEach(i=>{ fixes['fix_'+i.dataset.fix]=i.value.trim(); });
+    CHK=fixes;
+    try{ await api('/api/checks',{method:'PATCH',body:{draft:CHK}}); }catch(e){ console.error(e); }
+  },900);
 }
 
 /* ══════════════ 기준 ══════════════ */
@@ -781,6 +958,9 @@ const OPS=[
  ['모집단 대조','월간 점검 시 GitHub RELEASE 머지 PR 목록과 대장 건수를 대조해 모집단 완전성을 확인합니다.'],
  ['표본 재검토','QA유닛이 직접 검증하지 않은 건은 점검 시 일부를 표본으로 선정해 증적의 적정성을 재검토하고 결과를 기록합니다.'],
  ['시행일','시행일 이전 배포 건은 관리 대상이 아니며, 소급 보완 범위는 별도 결정해 기록합니다.'],
+ ['계정 및 권한','담당자별 계정으로 접속하며 계정을 공유하지 않습니다. 계정 발급·회수는 QA유닛 책임자가 승인합니다.\n· 관리자 — 계정 관리, 배포 건의 대장 제외, 점검 이력 삭제\n· 작성 권한 — 배포 건 등록·수정, 월간 점검 수행\n· 열람 전용 — 조회만 가능. 통제검토부서와 감사인 계정에 부여합니다.\n인사 이동이나 퇴사 시 계정을 즉시 비활성화하고 그 사실을 점검 기록에 남깁니다.'],
+ ['변경 이력','대장의 모든 등록·수정·삭제와 접속이 수행자·일시와 함께 자동 기록되며, 화면에서 수정하거나 삭제할 수 없습니다. 「변경 이력」 화면과 각 배포 건의 편집 화면에서 확인합니다.'],
+ ['기록 보존','배포 건은 대장에서 제외해도 기록 자체는 삭제하지 않고 제외 표시만 남깁니다. 흔적 없는 삭제가 가능하면 모집단 완전성을 담보할 수 없기 때문입니다.'],
 ];
 function renderStd(){
   const acc=(el,arr)=>$(el).innerHTML=arr.map(([t,d])=>
@@ -810,13 +990,53 @@ function exportCSV(){
   toast('CSV를 내보냈습니다');
 }
 
+/* ══════════════ 변경 이력 화면 ══════════════ */
+async function loadLog(){
+  const tb=$('logRows');
+  tb.innerHTML=`<tr><td colspan="5"><div class="empty" style="padding:26px">불러오는 중…</div></td></tr>`;
+  try{
+    const {log}=await api('/api/audit?limit=500');
+    LOG=log; renderLog();
+  }catch(e){
+    tb.innerHTML=`<tr><td colspan="5"><div class="empty" style="padding:26px"><b>이력을 불러오지 못했습니다</b>${esc(e.message)}</div></td></tr>`;
+  }
+}
+const ACTCLS={'entry.create':'c','entry.update':'u','entry.delete':'d','check.save':'u','check.delete':'d'};
+function renderLog(){
+  const q=$('logQ').value.trim().toLowerCase(), a=$('logAct').value;
+  const list=LOG.filter(l=>{
+    if(a&&l.action!==a) return false;
+    if(q){
+      const hay=[l.actor,l.actor_name,l.target,l.note,JSON.stringify(l.changed||'')].join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  const tb=$('logRows');
+  if(!list.length){
+    tb.innerHTML=`<tr><td colspan="5"><div class="empty" style="padding:36px"><b>표시할 이력이 없습니다</b>조건을 바꿔 다시 확인하십시오.</div></td></tr>`;
+    return;
+  }
+  tb.innerHTML=list.map(l=>`<tr>
+    <td class="d">${esc(when(l.at))}</td>
+    <td>${esc(l.actor_name||l.actor)}</td>
+    <td><span class="act-tag ${ACTCLS[l.action]||'l'}">${esc(ACT[l.action]||l.action)}</span></td>
+    <td class="id">${esc(l.note||l.target||'')}</td>
+    <td class="w"><div class="ch">${changeHTML(l.changed)||'<span style="color:var(--ink-3)">—</span>'}</div></td>
+  </tr>`).join('');
+}
+
 /* ══════════════ 부팅 ══════════════ */
-document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
-  document.querySelectorAll('nav button').forEach(x=>x.setAttribute('aria-current',x===b));
+const VIEWS={ledger:'v-ledger',check:'v-check',std:'std',log:'v-log'};
+document.querySelectorAll('nav button[data-v]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button[data-v]').forEach(x=>x.setAttribute('aria-current',x===b));
   const v=b.dataset.v;
-  $('v-ledger').hidden=v!=='ledger'; $('v-check').hidden=v!=='check'; $('std').hidden=v!=='std';
+  for(const key in VIEWS) $(VIEWS[key]).hidden=key!==v;
   if(v==='check') renderCheck();
+  if(v==='log') loadLog();
 });
+['logQ','logAct'].forEach(id=>$(id).addEventListener('input',renderLog));
+$('logReload').onclick=loadLog;
 $('add').onclick=()=>openDrawer(null);
 $('exp').onclick=exportCSV;
 $('dClose').onclick=$('dCancel').onclick=closeDrawer;
@@ -830,7 +1050,13 @@ $('histRows').addEventListener('click',async e=>{
   const cid=e.target.dataset.hcsv;
   if(cid){ const h=HIST.find(x=>x.id===cid); if(h) exportCheckCSV(h); return; }
   const id=e.target.dataset.hdel; if(!id) return;
-  HIST=HIST.filter(h=>h.id!==id); await store.set(KEY2,{hist:HIST,chk:CHK}); renderHist(); toast('이력을 삭제했습니다');
+  if(ME?.role!=='admin') return toast('삭제 권한이 없습니다');
+  const h=HIST.find(x=>x.id===id);
+  if(!confirm(`${h?.from} ~ ${h?.to} 점검 이력을 삭제합니다.\n\n점검 이력의 연속성은 통제 운영의 증거입니다. 진행하시겠습니까?`)) return;
+  try{
+    await api('/api/checks?id='+encodeURIComponent(id),{method:'DELETE'});
+    HIST=HIST.filter(h=>h.id!==id); renderHist(); toast('이력을 삭제했습니다');
+  }catch(err){ fail(err); }
 });
 ['q','fType','fVerdict','fFrom','fTo'].forEach(id=>$(id).addEventListener('input',renderLedger));
 $('fClear').onclick=()=>{['q','fType','fVerdict','fFrom','fTo'].forEach(id=>$(id).value='');renderLedger()};
@@ -843,13 +1069,74 @@ $('saveChk').onclick=saveCheck;
 $('expChk').onclick=()=>exportCheckCSV();
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeDrawer(); });
 
-(async()=>{
-  $('build').textContent='v'+APP_VERSION;
-  DATA=(await store.get(KEY))||[];
-  const c=await store.get(KEY2); if(c){HIST=c.hist||[];CHK=c.chk||{};}
+/* 점검 조치 내용 입력은 초안으로 자동 저장합니다. */
+$('chkRows').addEventListener('input',e=>{ if(e.target.dataset.fix!==undefined) queueDraft(); });
+
+/* ══════════════ 로그인 ══════════════ */
+function showGate(msg){
+  $('gate').classList.add('on');
+  const err=$('loginErr');
+  if(msg){ err.textContent=msg; err.classList.add('on'); } else { err.classList.remove('on'); }
+  $('lgPw').value='';
+  setTimeout(()=>($('lgUser').value?$('lgPw'):$('lgUser')).focus(),60);
+}
+function hideGate(){ $('gate').classList.remove('on'); }
+
+$('loginForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const btn=$('lgBtn'); btn.disabled=true; btn.textContent='확인 중…';
+  try{
+    const {user}=await api('/api/auth',{method:'POST',
+      body:{action:'login',username:$('lgUser').value.trim(),password:$('lgPw').value}});
+    ME=user; hideGate(); await boot();
+  }catch(err){
+    const box=$('loginErr'); box.textContent=err.message; box.classList.add('on');
+    $('lgPw').value=''; $('lgPw').focus();
+  }finally{ btn.disabled=false; btn.textContent='로그인'; }
+});
+
+$('logout').onclick=async()=>{
+  try{ await api('/api/auth',{method:'POST',body:{action:'logout'}}); }catch(e){}
+  ME=null; DATA=[]; HIST=[]; CHK={}; LOG=[];
+  renderLedger(); renderCheck();
+  showGate('로그아웃했습니다.');
+};
+
+const ROLE={admin:'관리자',member:'작성 권한',viewer:'열람 전용'};
+
+/* 로그인 이후 화면에 데이터를 채웁니다. */
+async function boot(){
+  $('whoName').textContent=ME.name+(ME.unit?` · ${ME.unit}`:'');
+  $('whoRole').textContent=`${ME.username} · ${ROLE[ME.role]||ME.role}`;
+
+  /* 열람 전용 계정에는 대장을 바꾸는 조작을 노출하지 않습니다. */
+  const ro=readonly();
+  $('add').hidden=ro; $('saveChk').hidden=ro;
+  ['cFrom','cTo','cDate','cBy','cApp','cPop','cPopNote','cSample','cOpinion']
+    .forEach(id=>{ $(id).disabled=ro; });
+
   const now=new Date(), first=new Date(now.getFullYear(),now.getMonth()-1,1), last=new Date(now.getFullYear(),now.getMonth(),0);
   $('cFrom').value=fmt(first); $('cTo').value=fmt(last); $('cDate').value=fmt(now);
+  if(!ro && !$('cBy').value) $('cBy').value=ME.name;
+
+  try{
+    const [e,c]=await Promise.all([api('/api/entries'),api('/api/checks')]);
+    DATA=e.entries; HIST=c.hist||[]; CHK=c.draft||{};
+  }catch(err){ fail(err); return; }
+
   renderLedger(); renderStd(); renderCheck();
+}
+
+(async()=>{
+  $('build').textContent='v'+APP_VERSION;
+  renderStd();
+  try{
+    const {user}=await api('/api/auth');
+    if(user){ ME=user; hideGate(); await boot(); } else showGate();
+  }catch(err){
+    showGate('서버에 연결하지 못했습니다. 잠시 후 다시 시도하십시오.');
+    console.error(err);
+  }
 })();
 </script>
 </body>
