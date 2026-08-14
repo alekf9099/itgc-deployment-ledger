@@ -208,6 +208,33 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
   padding:2px 7px;border-radius:20px;background:var(--line-2);color:var(--ink-2)}
 .act-tag.c{background:#E9F1EC;color:#2A6B45} .act-tag.u{background:#E7EDFB;color:#254A9C}
 .act-tag.d{background:var(--bad-bg);color:var(--bad)} .act-tag.l{background:#F2F4F7;color:var(--ink-3)}
+.act-tag.a{background:#F3EDFB;color:#5B3A9E}
+
+/* ─────────── 모달 ─────────── */
+.modal{position:fixed;inset:0;background:rgba(16,28,46,.45);z-index:70;display:none;place-items:center;padding:20px}
+.modal.on{display:grid}
+.modal form{background:var(--card);border-radius:12px;padding:26px 28px;width:min(400px,100%);box-shadow:0 20px 60px rgba(16,28,46,.28)}
+.modal h2{font-size:16px;margin-bottom:4px}
+.modal p.m{color:var(--ink-3);font-size:11.5px;margin:0 0 20px;line-height:1.6}
+.modal .err{background:var(--bad-bg);color:var(--bad);border:1px solid #EFC3C7;border-radius:7px;
+  padding:9px 12px;font-size:12px;margin-bottom:14px;display:none}
+.modal .err.on{display:block}
+.modal label.f{margin-bottom:13px}
+.modal .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+
+/* ─────────── 계정 ─────────── */
+.pwbox{background:var(--ok-bg);border:1px solid #BFE3D9;border-radius:9px;padding:14px 16px;margin-bottom:16px}
+.pwbox b{display:block;font-size:12.5px;color:var(--ok);margin-bottom:8px}
+.pwbox .v{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.pwbox code{font-family:var(--mono);font-size:15px;font-weight:600;background:var(--card);
+  border:1px solid #BFE3D9;border-radius:6px;padding:7px 12px;letter-spacing:.03em;color:var(--ink)}
+.pwbox small{display:block;font-size:11px;color:var(--ok);margin-top:9px;line-height:1.55}
+.users td.act{text-align:right}
+.users select{padding:4px 7px;font-size:12px;border-radius:6px}
+.users tr.off{background:#FAFBFC;color:var(--ink-3)}
+.users tr.off td.id,.users tr.off td.d{color:var(--ink-3)}
+.st{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px}
+.st.on{background:var(--ok-bg);color:var(--ok)} .st.off{background:var(--line-2);color:var(--ink-3)}
 @media (max-width:900px){
   body{grid-template-columns:1fr}
   nav{flex-direction:row;overflow-x:auto;padding:10px;align-items:center;gap:4px}
@@ -224,11 +251,13 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 
 <nav>
   <div class="brand"><b>배포 관리 대장</b><span>ITGC PC-01 / PD-02 · QA유닛</span></div>
-  <div class="who"><b id="whoName">—</b><span id="whoRole"></span><button id="logout">로그아웃</button></div>
+  <div class="who"><b id="whoName">—</b><span id="whoRole"></span>
+    <button id="pwOpen">비밀번호 변경</button> · <button id="logout">로그아웃</button></div>
   <button data-v="ledger" aria-current="true"><i>01</i>대장</button>
   <button data-v="check"><i>02</i>월간 점검</button>
   <button data-v="std"><i>03</i>작성 기준</button>
   <button data-v="log"><i>04</i>변경 이력</button>
+  <button data-v="users" id="navUsers" hidden><i>05</i>계정 관리</button>
   <div class="navfoot">통제부서 QA유닛<br>검토부서 TA유닛<br><span id="build">v—</span></div>
 </nav>
 
@@ -392,6 +421,55 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
       </table>
     </div>
   </section>
+
+  <!-- ══════ 계정 관리 ══════ -->
+  <section id="v-users" hidden>
+    <div class="head">
+      <div>
+        <h1>계정 관리</h1>
+        <p class="sub">담당자별 계정을 발급·회수합니다. 계정은 삭제하지 않고 비활성화만 합니다. 그 계정이 남긴 변경 이력의 수행자 정보를 보존해야 하기 때문입니다. 발급·권한 변경·비활성화는 모두 변경 이력에 기록됩니다.</p>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" id="uAddOpen">계정 추가</button>
+      </div>
+    </div>
+
+    <div class="pwbox" id="uPw" hidden>
+      <b id="uPwTitle">임시 비밀번호를 발급했습니다</b>
+      <div class="v"><code id="uPwVal"></code>
+        <button class="btn ghost" id="uPwCopy">복사</button>
+        <button class="btn ghost" id="uPwClose">닫기</button></div>
+      <small>이 값은 다시 확인할 수 없습니다. 본인에게 전달하고 최초 로그인 후 비밀번호를 변경하도록 안내하십시오.</small>
+    </div>
+
+    <div class="panel" id="uAdd" hidden>
+      <h3><i>+</i>계정 추가</h3>
+      <p>아이디는 이후 변경할 수 없습니다. 사내 계정 체계와 일치시키십시오. 통제검토부서(TA유닛)와 감사인에게는 열람 전용을 발급합니다.</p>
+      <div class="bar" style="margin:0">
+        <label class="f"><span>아이디<em>*</em></span><input type="text" id="uUser" style="width:210px" autocomplete="off"></label>
+        <label class="f"><span>성명<em>*</em></span><input type="text" id="uName" style="width:130px"></label>
+        <label class="f"><span>소속 유닛</span><input type="text" id="uUnit" style="width:130px" placeholder="QA유닛"></label>
+        <label class="f"><span>권한</span><select id="uRole">
+          <option value="member">작성 권한</option>
+          <option value="viewer">열람 전용</option>
+          <option value="admin">관리자</option>
+        </select></label>
+        <button class="btn" id="uCreate">발급</button>
+        <button class="btn ghost" id="uCancel">취소</button>
+      </div>
+    </div>
+
+    <div class="tablewrap">
+      <table class="users">
+        <thead><tr>
+          <th>아이디</th><th style="width:100px">성명</th><th style="width:100px">소속</th>
+          <th style="width:120px">권한</th><th style="width:80px">상태</th>
+          <th style="width:130px">최근 로그인</th><th style="width:110px">등록일</th><th style="width:190px"></th>
+        </tr></thead>
+        <tbody id="uRows"></tbody>
+      </table>
+    </div>
+  </section>
 </main>
 
 <!-- 인증 확인이 끝날 때까지 대장이 보이지 않도록 기본값을 표시 상태로 둡니다. -->
@@ -406,6 +484,24 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
       <input type="password" id="lgPw" name="password" autocomplete="current-password" required></label>
     <button class="btn" type="submit" id="lgBtn">로그인</button>
     <div class="foot">이 화면의 모든 입력과 변경은 수행자·일시와 함께 기록됩니다.<br>계정 발급은 QA유닛 책임자에게 요청하십시오.</div>
+  </form>
+</div>
+
+<div class="modal" id="pwModal">
+  <form id="pwForm">
+    <h2>비밀번호 변경</h2>
+    <p class="m">최초 로그인 시 발급받은 임시 비밀번호는 반드시 변경하십시오.<br>새 비밀번호는 10자 이상이어야 합니다.</p>
+    <div class="err" id="pwErr"></div>
+    <label class="f"><span>현재 비밀번호</span>
+      <input type="password" id="pwCur" autocomplete="current-password" required></label>
+    <label class="f"><span>새 비밀번호</span>
+      <input type="password" id="pwNew" autocomplete="new-password" required minlength="10"></label>
+    <label class="f"><span>새 비밀번호 확인</span>
+      <input type="password" id="pwNew2" autocomplete="new-password" required minlength="10"></label>
+    <div class="btns">
+      <button class="btn ghost" type="button" id="pwCancel">취소</button>
+      <button class="btn" type="submit" id="pwSave">변경</button>
+    </div>
   </form>
 </div>
 
@@ -487,7 +583,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.0.0';
+const APP_VERSION='2.1.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -683,7 +779,8 @@ async function loadEntryHist(rec){
   }
 }
 const ACT={'entry.create':'등록','entry.update':'수정','entry.delete':'삭제',
-  'check.save':'월간 점검 저장','check.delete':'월간 점검 삭제','login':'로그인','password.change':'비밀번호 변경'};
+  'check.save':'월간 점검 저장','check.delete':'월간 점검 삭제','login':'로그인','password.change':'비밀번호 변경',
+  'user.create':'계정 발급','user.update':'계정 변경','user.reset':'비밀번호 재설정'};
 function when(v){
   if(!v) return '';
   const d=new Date(v);
@@ -958,7 +1055,7 @@ const OPS=[
  ['모집단 대조','월간 점검 시 GitHub RELEASE 머지 PR 목록과 대장 건수를 대조해 모집단 완전성을 확인합니다.'],
  ['표본 재검토','QA유닛이 직접 검증하지 않은 건은 점검 시 일부를 표본으로 선정해 증적의 적정성을 재검토하고 결과를 기록합니다.'],
  ['시행일','시행일 이전 배포 건은 관리 대상이 아니며, 소급 보완 범위는 별도 결정해 기록합니다.'],
- ['계정 및 권한','담당자별 계정으로 접속하며 계정을 공유하지 않습니다. 계정 발급·회수는 QA유닛 책임자가 승인합니다.\n· 관리자 — 계정 관리, 배포 건의 대장 제외, 점검 이력 삭제\n· 작성 권한 — 배포 건 등록·수정, 월간 점검 수행\n· 열람 전용 — 조회만 가능. 통제검토부서와 감사인 계정에 부여합니다.\n인사 이동이나 퇴사 시 계정을 즉시 비활성화하고 그 사실을 점검 기록에 남깁니다.'],
+ ['계정 및 권한','담당자별 계정으로 접속하며 계정을 공유하지 않습니다. 계정 발급·회수는 QA유닛 책임자가 승인합니다.\n· 관리자 — 계정 관리, 배포 건의 대장 제외, 점검 이력 삭제\n· 작성 권한 — 배포 건 등록·수정, 월간 점검 수행\n· 열람 전용 — 조회만 가능. 통제검토부서와 감사인 계정에 부여합니다.\n인사 이동이나 퇴사 시 계정을 즉시 비활성화하고 그 사실을 점검 기록에 남깁니다.\n계정 발급·권한 변경·비활성화는 「계정 관리」 화면에서 관리자가 수행하며, 모든 조작이 변경 이력에 기록됩니다.\n계정은 삭제하지 않고 비활성화만 합니다. 그 계정이 남긴 변경 이력의 수행자 정보를 보존해야 하기 때문입니다.\n임시 비밀번호는 발급 시 한 번만 표시되며, 최초 로그인 후 본인이 변경합니다.'],
  ['변경 이력','대장의 모든 등록·수정·삭제와 접속이 수행자·일시와 함께 자동 기록되며, 화면에서 수정하거나 삭제할 수 없습니다. 「변경 이력」 화면과 각 배포 건의 편집 화면에서 확인합니다.'],
  ['기록 보존','배포 건은 대장에서 제외해도 기록 자체는 삭제하지 않고 제외 표시만 남깁니다. 흔적 없는 삭제가 가능하면 모집단 완전성을 담보할 수 없기 때문입니다.'],
 ];
@@ -1001,7 +1098,8 @@ async function loadLog(){
     tb.innerHTML=`<tr><td colspan="5"><div class="empty" style="padding:26px"><b>이력을 불러오지 못했습니다</b>${esc(e.message)}</div></td></tr>`;
   }
 }
-const ACTCLS={'entry.create':'c','entry.update':'u','entry.delete':'d','check.save':'u','check.delete':'d'};
+const ACTCLS={'entry.create':'c','entry.update':'u','entry.delete':'d','check.save':'u','check.delete':'d',
+  'user.create':'a','user.update':'a','user.reset':'a'};
 function renderLog(){
   const q=$('logQ').value.trim().toLowerCase(), a=$('logAct').value;
   const list=LOG.filter(l=>{
@@ -1026,15 +1124,159 @@ function renderLog(){
   </tr>`).join('');
 }
 
+/* ══════════════ 비밀번호 변경 ══════════════ */
+function pwOpen(){
+  ['pwCur','pwNew','pwNew2'].forEach(id=>$(id).value='');
+  $('pwErr').classList.remove('on');
+  $('pwModal').classList.add('on');
+  setTimeout(()=>$('pwCur').focus(),60);
+}
+function pwClose(){ $('pwModal').classList.remove('on'); }
+$('pwOpen').onclick=pwOpen;
+$('pwCancel').onclick=pwClose;
+$('pwModal').addEventListener('click',e=>{ if(e.target===$('pwModal')) pwClose(); });
+
+$('pwForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const err=$('pwErr');
+  const show=m=>{ err.textContent=m; err.classList.add('on'); };
+  const cur=$('pwCur').value, next=$('pwNew').value;
+  if(next.length<10) return show('새 비밀번호는 10자 이상이어야 합니다.');
+  if(next!==$('pwNew2').value) return show('새 비밀번호가 서로 다릅니다.');
+  if(next===cur) return show('현재 비밀번호와 다른 값을 입력하십시오.');
+
+  const btn=$('pwSave'); btn.disabled=true;
+  try{
+    await api('/api/auth',{method:'POST',body:{action:'password',current:cur,next}});
+    pwClose(); toast('비밀번호를 변경했습니다');
+  }catch(ex){
+    if(ex instanceof ApiError && ex.status===401 && /현재 비밀번호/.test(ex.message)) show(ex.message);
+    else if(ex instanceof ApiError && ex.status===401) fail(ex);
+    else show(ex.message||'변경에 실패했습니다.');
+  }finally{ btn.disabled=false; }
+});
+
+/* ══════════════ 계정 관리 ══════════════ */
+let USERS=[];
+const ROLELABEL={admin:'관리자',member:'작성 권한',viewer:'열람 전용'};
+
+async function loadUsers(){
+  const tb=$('uRows');
+  tb.innerHTML=`<tr><td colspan="8"><div class="empty" style="padding:26px">불러오는 중…</div></td></tr>`;
+  try{
+    const {users}=await api('/api/users');
+    USERS=users; renderUsers();
+  }catch(e){
+    tb.innerHTML=`<tr><td colspan="8"><div class="empty" style="padding:26px"><b>계정 목록을 불러오지 못했습니다</b>${esc(e.message)}</div></td></tr>`;
+  }
+}
+function renderUsers(){
+  $('uRows').innerHTML=USERS.map(u=>{
+    const me=ME&&u.id===ME.id;
+    return `<tr class="${u.active?'':'off'}">
+      <td class="id">${esc(u.username)}${me?' <span class="act-tag a">본인</span>':''}</td>
+      <td>${esc(u.name)}</td><td>${esc(u.unit||'')}</td>
+      <td><select data-role="${u.id}" ${me?'disabled title="자신의 권한은 변경할 수 없습니다"':''}>
+        ${Object.entries(ROLELABEL).map(([v,l])=>
+          `<option value="${v}"${u.role===v?' selected':''}>${l}</option>`).join('')}
+      </select></td>
+      <td><span class="st ${u.active?'on':'off'}">${u.active?'활성':'비활성'}</span></td>
+      <td class="d">${esc(when(u.last_login_at))||'—'}</td>
+      <td class="d">${esc(when(u.created_at).slice(0,10))}</td>
+      <td class="act">
+        <button data-reset="${u.id}">비밀번호 재설정</button>
+        ${me?'':`<button data-toggle="${u.id}">${u.active?'비활성화':'활성화'}</button>`}
+      </td></tr>`;
+  }).join('');
+}
+function showPw(title,username,password){
+  $('uPwTitle').textContent=`${title} — ${username}`;
+  $('uPwVal').textContent=password;
+  $('uPw').hidden=false;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+$('uPwClose').onclick=()=>{ $('uPw').hidden=true; $('uPwVal').textContent=''; };
+$('uPwCopy').onclick=async()=>{
+  try{ await navigator.clipboard.writeText($('uPwVal').textContent); toast('복사했습니다'); }
+  catch(e){ toast('복사에 실패했습니다. 직접 선택해 복사하십시오'); }
+};
+
+$('uAddOpen').onclick=()=>{
+  $('uAdd').hidden=false;
+  ['uUser','uName','uUnit'].forEach(id=>$(id).value='');
+  $('uRole').value='member';
+  $('uUser').focus();
+};
+$('uCancel').onclick=()=>{ $('uAdd').hidden=true; };
+
+$('uCreate').onclick=async()=>{
+  const body={username:$('uUser').value.trim(),name:$('uName').value.trim(),
+    unit:$('uUnit').value.trim(),role:$('uRole').value};
+  if(!body.username||!body.name) return toast('아이디와 성명을 입력하십시오');
+  const btn=$('uCreate'); btn.disabled=true;
+  try{
+    const r=await api('/api/users',{method:'POST',body});
+    USERS.push(r.user); renderUsers();
+    $('uAdd').hidden=true;
+    showPw('임시 비밀번호를 발급했습니다',r.username||body.username,r.password);
+  }catch(e){ fail(e); }
+  finally{ btn.disabled=false; }
+};
+
+$('uRows').addEventListener('change',async e=>{
+  const id=e.target.dataset.role; if(!id) return;
+  const u=USERS.find(x=>x.id===+id);
+  const next=e.target.value;
+  if(!confirm(`${u.name}(${u.username})의 권한을 「${ROLELABEL[next]}」로 변경합니다.\n\n변경 이력에 기록됩니다. 진행하시겠습니까?`)){
+    e.target.value=u.role; return;
+  }
+  try{
+    const r=await api('/api/users',{method:'PATCH',body:{id:u.id,role:next}});
+    Object.assign(u,r.user); renderUsers(); toast('권한을 변경했습니다');
+  }catch(err){ e.target.value=u.role; fail(err); }
+});
+
+$('uRows').addEventListener('click',async e=>{
+  const rid=e.target.dataset.reset;
+  if(rid){
+    const u=USERS.find(x=>x.id===+rid);
+    if(!confirm(`${u.name}(${u.username})의 비밀번호를 재설정합니다.\n\n기존 비밀번호는 즉시 사용할 수 없게 됩니다. 진행하시겠습니까?`)) return;
+    try{
+      const r=await api('/api/users',{method:'POST',body:{action:'reset',id:u.id}});
+      showPw('비밀번호를 재설정했습니다',r.username,r.password);
+    }catch(err){ fail(err); }
+    return;
+  }
+  const tid=e.target.dataset.toggle; if(!tid) return;
+  const u=USERS.find(x=>x.id===+tid);
+  const on=!u.active;
+  const msg=on
+    ? `${u.name}(${u.username}) 계정을 다시 활성화합니다.`
+    : `${u.name}(${u.username}) 계정을 비활성화합니다.\n\n즉시 로그인할 수 없게 됩니다. 지금까지 남긴 변경 이력은 그대로 보존됩니다.`;
+  if(!confirm(msg+'\n\n진행하시겠습니까?')) return;
+  try{
+    const r=await api('/api/users',{method:'PATCH',body:{id:u.id,active:on}});
+    Object.assign(u,r.user); renderUsers(); toast(on?'활성화했습니다':'비활성화했습니다');
+  }catch(err){ fail(err); }
+});
+
 /* ══════════════ 부팅 ══════════════ */
-const VIEWS={ledger:'v-ledger',check:'v-check',std:'std',log:'v-log'};
+const VIEWS={ledger:'v-ledger',check:'v-check',std:'std',log:'v-log',users:'v-users'};
 document.querySelectorAll('nav button[data-v]').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button[data-v]').forEach(x=>x.setAttribute('aria-current',x===b));
   const v=b.dataset.v;
   for(const key in VIEWS) $(VIEWS[key]).hidden=key!==v;
   if(v==='check') renderCheck();
   if(v==='log') loadLog();
+  if(v==='users') loadUsers();
 });
+/* 계정 관리 화면에서 권한이 낮은 계정으로 바뀌는 경우를 막기 위해, 로그인할 때
+   화면을 항상 대장으로 되돌립니다. */
+function resetView(){
+  document.querySelectorAll('nav button[data-v]').forEach(b=>
+    b.setAttribute('aria-current',b.dataset.v==='ledger'));
+  for(const key in VIEWS) $(VIEWS[key]).hidden=key!=='ledger';
+}
 ['logQ','logAct'].forEach(id=>$(id).addEventListener('input',renderLog));
 $('logReload').onclick=loadLog;
 $('add').onclick=()=>openDrawer(null);
@@ -1067,7 +1309,7 @@ Object.values(F).forEach(id=>$(id).addEventListener('input',()=>{
 ['cFrom','cTo','cPop'].forEach(id=>$(id).addEventListener('input',renderCheck));
 $('saveChk').onclick=saveCheck;
 $('expChk').onclick=()=>exportCheckCSV();
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeDrawer(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeDrawer(); pwClose(); } });
 
 /* 점검 조치 내용 입력은 초안으로 자동 저장합니다. */
 $('chkRows').addEventListener('input',e=>{ if(e.target.dataset.fix!==undefined) queueDraft(); });
@@ -1102,12 +1344,13 @@ $('logout').onclick=async()=>{
   showGate('로그아웃했습니다.');
 };
 
-const ROLE={admin:'관리자',member:'작성 권한',viewer:'열람 전용'};
-
 /* 로그인 이후 화면에 데이터를 채웁니다. */
 async function boot(){
   $('whoName').textContent=ME.name+(ME.unit?` · ${ME.unit}`:'');
-  $('whoRole').textContent=`${ME.username} · ${ROLE[ME.role]||ME.role}`;
+  $('whoRole').textContent=`${ME.username} · ${ROLELABEL[ME.role]||ME.role}`;
+  $('navUsers').hidden=ME.role!=='admin';
+  resetView();
+  $('uPw').hidden=true; $('uAdd').hidden=true; USERS=[];
 
   /* 열람 전용 계정에는 대장을 바꾸는 조작을 노출하지 않습니다. */
   const ro=readonly();
