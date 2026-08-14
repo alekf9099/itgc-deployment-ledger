@@ -520,7 +520,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
         <label class="f"><span>릴리즈 구분<em>*</em></span><select id="f_type"><option value="">선택</option><option>정규</option><option>수시</option><option>핫픽스</option></select></label>
       </div>
       <div class="row one">
-        <label class="f"><span>증적 문서 ID<em>*</em></span><input type="text" id="f_id" placeholder="QA-A-20260813-01">
+        <label class="f"><span>증적 문서 ID<em>*</em></span><input type="text" id="f_id" placeholder="QA-유형코드-YYYYMMDD-01">
           <div class="hint">배포일과 유형을 먼저 고르면 자동 생성됩니다. 보고서 본문과 게시글 제목에 동일하게 표기하십시오.</div></label>
       </div>
       <div class="row">
@@ -583,7 +583,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.1.0';
+const APP_VERSION='2.1.1';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
