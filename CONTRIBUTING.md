@@ -25,7 +25,10 @@ git switch -c feat/브랜치명
    API가 있어 `index.html`을 파일로 여는 것만으로는 동작하지 않습니다.
 3. 판정 로직(`judge`, `deadline`, `CHECKS`)이나 입력 항목(`F`, `DEF_IN`)을 바꿨다면
    `APP_VERSION`을 올립니다.
-4. 검사를 돌립니다.
+4. 화면 구성·입력 항목·권한이 바뀌었다면 [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md)를
+   같은 PR에서 갱신하고 문서 상단의 적용 버전을 맞춥니다. 담당자 교육과 감사 대응에
+   쓰이는 문서이므로, 화면과 어긋나면 그 자체가 지적 사항이 됩니다.
+5. 검사를 돌립니다.
 
 ```bash
 node scripts/check.mjs
