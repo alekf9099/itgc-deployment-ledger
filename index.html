@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>배포 관리 대장 · QA유닛</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet">
+<style>
+:root{
+  --paper:#F6F7F9; --card:#FFFFFF; --ink:#101C2E; --ink-2:#3D4C61; --ink-3:#7A879B;
+  --line:#DFE4EB; --line-2:#EDF0F4;
+  --nav:#0E1929;
+  --ok:#0E7C66; --ok-bg:#E3F3EF;
+  --bad:#B4232E; --bad-bg:#FBE9EA;
+  --warn:#8A5A00; --warn-bg:#FCF1DC;
+  --idle:#C6CDD8;
+  --focus:#2E6BE6;
+  --mono:ui-monospace,"SFMono-Regular",Menlo,"Cascadia Mono",Consolas,monospace;
+  --sans:"Pretendard Variable",Pretendard,-apple-system,system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  font-family:var(--sans); background:var(--paper); color:var(--ink);
+  font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  display:grid; grid-template-columns:216px 1fr; min-height:100vh;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{margin:0;font-weight:700;letter-spacing:-.02em}
+
+/* ─────────── nav ─────────── */
+nav{background:var(--nav);color:#fff;padding:20px 0;display:flex;flex-direction:column;gap:2px}
+.brand{padding:0 20px 20px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:14px}
+.brand b{display:block;font-size:15px;letter-spacing:-.03em}
+.brand span{display:block;font-family:var(--mono);font-size:10.5px;color:#8B9BB4;margin-top:5px;letter-spacing:.04em}
+nav button{
+  background:none;border:0;text-align:left;padding:9px 20px;color:#B4C0D2;cursor:pointer;
+  display:flex;align-items:center;gap:9px;font-size:13.5px;border-left:3px solid transparent;
+}
+nav button:hover{color:#fff;background:rgba(255,255,255,.05)}
+nav button[aria-current="true"]{color:#fff;border-left-color:#5B8DEF;background:rgba(91,141,239,.13);font-weight:600}
+nav button i{font-family:var(--mono);font-size:10px;color:#66768F;font-style:normal}
+nav button[aria-current="true"] i{color:#5B8DEF}
+.navfoot{margin-top:auto;padding:14px 20px 0;border-top:1px solid rgba(255,255,255,.1);font-size:10.5px;color:#66768F;font-family:var(--mono);line-height:1.7}
+
+/* ─────────── layout ─────────── */
+main{padding:26px 30px 60px;max-width:1500px;overflow-x:hidden}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:6px}
+.head h1{font-size:23px}
+.sub{color:var(--ink-3);font-size:12.5px;margin:5px 0 22px;max-width:900px}
+.sub code{font-family:var(--mono);font-size:11.5px;background:var(--line-2);padding:1px 5px;border-radius:3px}
+
+/* ─────────── signature: 판정 스트립 ─────────── */
+.strip{display:inline-flex;gap:2px;align-items:center}
+.strip s{width:7px;height:19px;border-radius:1.5px;background:var(--idle);display:block;text-decoration:none;position:relative}
+.strip s[data-v="ok"]{background:#2FA98D}
+.strip s[data-v="bad"]{background:#D2434F}
+.strip s[data-v="na"]{background:#D8DEE7}
+.striplegend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--ink-3);font-family:var(--mono)}
+.striplegend b{color:var(--ink-2);font-weight:600}
+
+/* ─────────── cards / summary ─────────── */
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));margin-bottom:20px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:13px 15px}
+.stat label{display:block;font-size:11px;color:var(--ink-3);letter-spacing:.01em;margin-bottom:5px}
+.stat b{font-family:var(--mono);font-size:25px;font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.stat.hot{border-color:#EFC3C7;background:var(--bad-bg)}
+.stat.hot b{color:var(--bad)}
+.stat.good{border-color:#BFE3D9;background:var(--ok-bg)}
+.stat.good b{color:var(--ok)}
+.stat small{display:block;font-size:10.5px;color:var(--ink-3);margin-top:3px;font-family:var(--mono)}
+
+/* ─────────── toolbar ─────────── */
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.bar .sp{flex:1}
+input[type=text],input[type=date],input[type=number],select,textarea{
+  background:var(--card);border:1px solid var(--line);border-radius:7px;padding:7px 10px;font-size:13px;
+}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--focus);outline-offset:-1px;border-color:var(--focus)}
+label.f{display:block}
+label.f>span{display:block;font-size:11.5px;color:var(--ink-2);margin-bottom:4px;font-weight:600}
+label.f>span em{color:var(--bad);font-style:normal;margin-left:2px}
+label.f input,label.f select,label.f textarea{width:100%}
+.btn{background:var(--ink);color:#fff;border:0;border-radius:7px;padding:8px 15px;cursor:pointer;font-weight:600;font-size:13px}
+.btn:hover{background:#1E3050}
+.btn.ghost{background:var(--card);color:var(--ink-2);border:1px solid var(--line);font-weight:500}
+.btn.ghost:hover{background:var(--line-2);color:var(--ink)}
+.btn.danger{background:var(--card);color:var(--bad);border:1px solid #EFC3C7}
+.btn:focus-visible,nav button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+/* ─────────── table ─────────── */
+.tablewrap{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:64vh}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:12.5px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line-2);white-space:nowrap}
+thead th{
+  position:sticky;top:0;z-index:2;background:#F0F2F6;font-size:11px;color:var(--ink-2);font-weight:700;
+  border-bottom:1px solid var(--line);letter-spacing:.01em
+}
+tbody tr:hover{background:#F8FAFC}
+tbody tr.flag{background:#FDF4F5}
+tbody tr.flag:hover{background:#FBEDEF}
+td.id,td.num,td.d{font-family:var(--mono);font-size:11.5px;font-variant-numeric:tabular-nums}
+td.act{text-align:right}
+td.act button{background:none;border:0;color:var(--ink-3);cursor:pointer;padding:2px 5px;border-radius:4px;font-size:11.5px}
+td.act button:hover{background:var(--line-2);color:var(--ink)}
+.tag{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:20px;font-family:var(--mono);letter-spacing:.02em}
+.t-R{background:#E7EDFB;color:#254A9C} .t-A{background:#E9F1EC;color:#2A6B45} .t-E{background:#FBE9EA;color:#A32530}
+.p-ok{background:var(--ok-bg);color:var(--ok)} .p-cond{background:var(--warn-bg);color:var(--warn)} .p-fail{background:var(--bad-bg);color:var(--bad)}
+.empty{padding:52px 20px;text-align:center;color:var(--ink-3)}
+.empty b{display:block;color:var(--ink-2);margin-bottom:6px;font-size:14px}
+
+/* ─────────── drawer ─────────── */
+.scrim{position:fixed;inset:0;background:rgba(16,28,46,.42);opacity:0;pointer-events:none;transition:opacity .16s;z-index:40}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{
+  position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);background:var(--card);z-index:41;
+  transform:translateX(100%);transition:transform .2s cubic-bezier(.3,.8,.3,1);
+  display:flex;flex-direction:column;box-shadow:-16px 0 40px rgba(16,28,46,.14)
+}
+.drawer.on{transform:none}
+.drawer header{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.drawer header h2{font-size:16px}
+.drawer .body{padding:20px 22px;overflow:auto;flex:1}
+.drawer footer{padding:14px 22px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;background:#FBFCFD}
+.fs{border:0;padding:0;margin:0 0 22px}
+.fs legend{font-size:11px;font-weight:700;color:var(--ink-3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:11px;font-family:var(--mono)}
+.row{display:grid;gap:11px;grid-template-columns:1fr 1fr;margin-bottom:11px}
+.row.one{grid-template-columns:1fr}
+.hint{font-size:11px;color:var(--ink-3);margin-top:4px;line-height:1.45}
+.verdict{background:#F7F9FB;border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:18px}
+.verdict .vh{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}
+.verdict .vh b{font-size:12.5px}
+.vlist{display:grid;gap:5px;font-size:11.5px;font-family:var(--mono)}
+.vlist div{display:flex;justify-content:space-between;gap:10px}
+.vlist span:last-child{font-weight:600}
+.v-ok{color:var(--ok)} .v-bad{color:var(--bad)} .v-na{color:var(--ink-3)}
+
+/* ─────────── 월간점검 ─────────── */
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 22px;margin-bottom:16px}
+.panel>h3{font-size:14px;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.panel>h3 i{font-family:var(--mono);font-size:11px;color:var(--ink-3);font-style:normal;font-weight:600}
+.panel>p{color:var(--ink-3);font-size:11.5px;margin:0 0 15px}
+.kv{display:grid;grid-template-columns:150px 1fr;border-top:1px solid var(--line-2)}
+.kv>div{padding:8px 0;border-bottom:1px solid var(--line-2);font-size:12.5px}
+.kv>div:nth-child(odd){color:var(--ink-2);font-weight:600;background:#FAFBFC;padding-left:11px;margin-right:-1px}
+.chk{width:100%;border-collapse:collapse;font-size:12.5px}
+.chk th{background:#F0F2F6;font-size:11px;padding:7px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
+.chk td{padding:7px 9px;border-bottom:1px solid var(--line-2);vertical-align:top}
+.chk td.c{text-align:center;font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
+.chk tr.hit{background:var(--bad-bg)}
+.chk tr.hit td.c{color:var(--bad)}
+.chk .crit{color:var(--ink-3);font-size:11px;white-space:normal;max-width:420px}
+.split td{background:#EEF3FB;font-size:11px;color:#254A9C;font-weight:600;padding:6px 9px}
+.result{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:9px;font-weight:700;font-size:14px}
+.result.pass{background:var(--ok-bg);color:var(--ok);border:1px solid #BFE3D9}
+.result.fail{background:var(--bad-bg);color:var(--bad);border:1px solid #EFC3C7}
+.result small{font-weight:500;font-size:11.5px;opacity:.85;font-family:var(--mono)}
+.matchbox{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.matchbox label.f{width:170px}
+.mres{padding:7px 14px;border-radius:7px;font-weight:700;font-size:12.5px;font-family:var(--mono)}
+.mres.y{background:var(--ok-bg);color:var(--ok)} .mres.n{background:var(--bad-bg);color:var(--bad)} .mres.i{background:var(--line-2);color:var(--ink-3)}
+
+/* ─────────── 기준 ─────────── */
+.def{border-top:1px solid var(--line-2)}
+.def details{border-bottom:1px solid var(--line-2)}
+.def summary{padding:11px 2px;cursor:pointer;font-weight:600;font-size:13px;display:flex;gap:9px;align-items:center}
+.def summary::marker{color:var(--ink-3)}
+.def summary code{font-family:var(--mono);font-size:11px;color:var(--ink-3);font-weight:500}
+.def .dd{padding:0 2px 14px;color:var(--ink-2);font-size:12.5px;white-space:pre-line;line-height:1.65}
+.toast{
+  position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);background:var(--ink);color:#fff;
+  padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:.18s;z-index:60
+}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+@media (max-width:900px){
+  body{grid-template-columns:1fr}
+  nav{flex-direction:row;overflow-x:auto;padding:10px;align-items:center;gap:4px}
+  .brand,.navfoot{display:none}
+  nav button{border-left:0;border-bottom:3px solid transparent;white-space:nowrap;padding:8px 12px}
+  nav button[aria-current="true"]{border-left-color:transparent;border-bottom-color:#5B8DEF}
+  main{padding:18px 16px 50px}
+  .row{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="brand"><b>배포 관리 대장</b><span>ITGC PC-01 / PD-02 · QA유닛</span></div>
+  <button data-v="ledger" aria-current="true"><i>01</i>대장</button>
+  <button data-v="check"><i>02</i>월간 점검</button>
+  <button data-v="std"><i>03</i>작성 기준</button>
+  <div class="navfoot">통제부서 QA유닛<br>검토부서 TA유닛<br><span id="build">v—</span></div>
+</nav>
+
+<main>
+  <!-- ══════ 대장 ══════ -->
+  <section id="v-ledger">
+    <div class="head">
+      <div>
+        <h1>배포 관리 대장</h1>
+        <p class="sub">이 목록 전체가 PC-01 모집단입니다. 배포 이력 전수를 기재하고, 각 건을 증적 문서와 1:1로 연결합니다. 판정 스트립의 붉은 칸이 조치가 필요한 항목입니다.</p>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn ghost" id="exp">CSV 내보내기</button>
+        <button class="btn" id="add">배포 건 추가</button>
+      </div>
+    </div>
+
+    <div class="grid" id="stats"></div>
+
+    <div class="bar">
+      <input type="text" id="q" placeholder="ID · 시스템 · 담당자 검색" style="width:230px">
+      <select id="fType"><option value="">유형 전체</option><option>정규</option><option>수시</option><option>핫픽스</option></select>
+      <select id="fVerdict"><option value="">판정 전체</option><option>확인필요</option><option>정상</option></select>
+      <input type="date" id="fFrom" title="배포일 시작"><input type="date" id="fTo" title="배포일 종료">
+      <button class="btn ghost" id="fClear">초기화</button>
+      <div class="sp"></div>
+      <div class="striplegend">
+        <span><b>스트립</b> 기한·직무·승인·매핑·정합성·ID</span>
+      </div>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th>판정</th><th>증적 문서 ID</th><th>배포일</th><th>유형</th><th>대상 시스템</th>
+          <th>일감 / 릴리즈</th><th>작성자</th><th>검증자</th><th>QA 판정</th>
+          <th>승인자</th><th>등록일</th><th>기한</th><th>상태</th><th></th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ══════ 월간 점검 ══════ -->
+  <section id="v-check" hidden>
+    <div class="head">
+      <div>
+        <h1>월간 점검</h1>
+        <p class="sub">QA유닛이 월 1회 수행합니다. 집계 기간은 <b>배포일 기준</b>이며, 기간 말 배포 건의 등록 기한이 지난 익월 초에 수행합니다. 지적사항이 없어도 이력을 남깁니다.</p>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn ghost" id="expChk">점검 결과 CSV</button>
+        <button class="btn" id="saveChk">점검 결과 저장</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3><i>01</i>점검 개요</h3>
+      <div class="kv">
+        <div>점검 대상 통제</div><div>PC-01 애플리케이션 변경 승인 및 개발자/사용자 테스트 · PD-02 데이터 정합성 테스트</div>
+        <div>점검 근거</div><div>릴리즈 유형별 QA/QC 증적 수립 표준 가이드라인 5항</div>
+        <div>점검 주체</div><div>QA유닛 (통제부서) · 통제검토부서 TA유닛의 검토와는 별개 절차</div>
+        <div>점검 방법</div><div>대장 전수 검토 및 배포 이력(GitHub RELEASE 머지 PR 목록) 대조</div>
+      </div>
+      <div class="bar" style="margin:16px 0 0">
+        <label class="f"><span>대상 기간 시작</span><input type="date" id="cFrom"></label>
+        <label class="f"><span>대상 기간 종료</span><input type="date" id="cTo"></label>
+        <label class="f"><span>점검 수행일</span><input type="date" id="cDate"></label>
+        <label class="f"><span>점검자</span><input type="text" id="cBy" placeholder="성명"></label>
+        <label class="f"><span>확인자</span><input type="text" id="cApp" placeholder="QA유닛 책임자"></label>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3><i>02</i>모집단 완전성 확인</h3>
+      <p>대장이 배포 이력 전수를 담고 있는지 확인합니다. 두 건수가 다르면 원인을 규명하고 누락 건을 대장에 추가합니다. PC-01에서 가장 먼저 검증되는 항목입니다.</p>
+      <div class="matchbox">
+        <label class="f"><span>배포 이력 건수 (GitHub PR)</span><input type="number" id="cPop" min="0" placeholder="직접 입력"></label>
+        <label class="f"><span>대장 기재 건수</span><input type="text" id="cLed" readonly style="background:var(--line-2)"></label>
+        <div class="mres i" id="cMatch">미입력</div>
+      </div>
+      <label class="f" style="margin-top:12px"><span>차이 원인 및 조치</span><textarea id="cPopNote" rows="2" placeholder="불일치한 경우 원인과 조치 내용을 기재합니다."></textarea></label>
+    </div>
+
+    <div class="panel">
+      <h3><i>03</i>점검 항목별 결과</h3>
+      <p>기간 내 배포 건에서 자동 집계됩니다. 상단은 지적 항목으로 1건 이상이면 조치 내용을 기재해야 합니다. 하단은 지적이 아닌 확인 항목입니다.</p>
+      <table class="chk"><thead><tr>
+        <th style="width:200px">점검 항목</th><th style="width:72px">통제</th><th style="width:54px">건수</th>
+        <th>판단 기준</th><th style="width:200px">조치 내용</th>
+      </tr></thead><tbody id="chkRows"></tbody></table>
+    </div>
+
+    <div class="panel">
+      <h3><i>04</i>표본 재검토</h3>
+      <p>QA유닛이 직접 검증하지 않은 건 중 일부를 표본으로 확인합니다. 형식 점검만으로는 담보되지 않는 검증 품질을 보는 절차입니다.</p>
+      <label class="f"><span>표본 대상 및 재검토 결과</span><textarea id="cSample" rows="3" placeholder="증적 문서 ID, 선정 사유, 재검토 결과, 미비 사항 및 조치"></textarea></label>
+    </div>
+
+    <div class="panel">
+      <h3><i>05</i>점검 결과</h3>
+      <div class="result pass" id="cResult"></div>
+      <label class="f" style="margin-top:14px"><span>점검자 의견</span><textarea id="cOpinion" rows="3"></textarea></label>
+    </div>
+
+    <div class="panel">
+      <h3><i>06</i>점검 이력</h3>
+      <p>월별 점검 결과를 누적합니다. 이력의 연속성 자체가 통제 운영의 증거입니다.</p>
+      <table class="chk"><thead><tr>
+        <th>대상 기간</th><th>수행일</th><th>점검자</th><th>확인자</th><th>모집단</th><th>지적</th><th>결과</th><th style="width:130px"></th>
+      </tr></thead><tbody id="histRows"></tbody></table>
+    </div>
+  </section>
+
+  <!-- ══════ 기준 ══════ -->
+  <section id="std" hidden>
+    <div class="head"><div>
+      <h1>작성 기준</h1>
+      <p class="sub">「릴리즈 유형별 QA/QC 증적 수립 표준 가이드라인」과 일치해야 합니다. 가이드라인 개정 시 이 기준도 함께 갱신합니다.</p>
+    </div></div>
+    <div class="panel"><h3><i>01</i>입력 항목</h3><div class="def" id="defIn"></div></div>
+    <div class="panel"><h3><i>02</i>자동 판정</h3><div class="def" id="defFx"></div></div>
+    <div class="panel"><h3><i>03</i>유형별 보고서 작성 범위</h3>
+      <p>「미적용」 항목은 해당 유형에서 작성 대상이 아니므로 공란이어도 미작성으로 보지 않습니다. 차등 적용의 근거가 되는 규정입니다.</p>
+      <table class="chk"><thead><tr><th>QA 완료 보고서 항목</th><th style="width:88px">정규</th><th style="width:88px">수시</th><th style="width:88px">핫픽스</th></tr></thead><tbody id="scopeRows"></tbody></table>
+    </div>
+    <div class="panel"><h3><i>04</i>운영 규칙</h3><div class="def" id="defOps" style="border:0"></div></div>
+  </section>
+</main>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="dTitle">
+  <header><h2 id="dTitle">배포 건 추가</h2><button class="btn ghost" id="dClose">닫기</button></header>
+  <div class="body">
+    <div class="verdict">
+      <div class="vh"><b>자동 판정</b><span class="strip" id="dStrip"></span></div>
+      <div class="vlist" id="dVerdict"></div>
+    </div>
+    <fieldset class="fs"><legend>모집단 식별</legend>
+      <div class="row">
+        <label class="f"><span>배포일<em>*</em></span><input type="date" id="f_date"></label>
+        <label class="f"><span>릴리즈 구분<em>*</em></span><select id="f_type"><option value="">선택</option><option>정규</option><option>수시</option><option>핫픽스</option></select></label>
+      </div>
+      <div class="row one">
+        <label class="f"><span>증적 문서 ID<em>*</em></span><input type="text" id="f_id" placeholder="QA-A-20260813-01">
+          <div class="hint">배포일과 유형을 먼저 고르면 자동 생성됩니다. 보고서 본문과 게시글 제목에 동일하게 표기하십시오.</div></label>
+      </div>
+      <div class="row">
+        <label class="f"><span>대상 시스템<em>*</em></span><input type="text" id="f_sys" placeholder="카피킬러 / muhayu-repo"></label>
+        <label class="f"><span>유형 판정자<em>*</em></span><input type="text" id="f_judge"></label>
+      </div>
+      <div class="row one">
+        <label class="f"><span>일감 / 릴리즈 식별자</span><input type="text" id="f_task" placeholder="COW #20163">
+          <div class="hint">정규는 릴리즈 회차 또는 프로젝트명, 수시는 COW 번호, 핫픽스는 조치 내용 요약을 기재합니다.</div></label>
+      </div>
+    </fieldset>
+    <fieldset class="fs"><legend>검증 및 승인</legend>
+      <div class="row">
+        <label class="f"><span>변경 작성자<em>*</em></span><input type="text" id="f_dev"></label>
+        <label class="f"><span>검증 수행자<em>*</em></span><input type="text" id="f_qa">
+          <div class="hint">변경 작성자와 같을 수 없습니다.</div></label>
+      </div>
+      <div class="row">
+        <label class="f"><span>QA 판정</span><select id="f_verdict"><option value="">선택</option><option>통과</option><option>조건부 통과</option><option>실패(반려)</option></select></label>
+        <label class="f"><span>배포 승인자<em>*</em></span><input type="text" id="f_appr"></label>
+      </div>
+      <div class="row">
+        <label class="f"><span>배포 승인일<em>*</em></span><input type="date" id="f_apprd"></label>
+        <label class="f"><span>증적 등록일</span><input type="date" id="f_reg"></label>
+      </div>
+      <div class="row one">
+        <label class="f"><span>증적 등록 경로</span><input type="text" id="f_path" placeholder="게시판 경로 또는 URL"></label>
+      </div>
+    </fieldset>
+    <fieldset class="fs"><legend>데이터 정합성 (PD-02)</legend>
+      <div class="row">
+        <label class="f"><span>스키마 · 데이터 변경</span><select id="f_schema"><option value="">선택</option><option>해당</option><option>없음</option></select></label>
+        <label class="f"><span>정합성 검증</span><select id="f_int"><option value="">해당 없음 (공란)</option><option>완료</option><option>부적합</option><option>미실시</option></select></label>
+      </div>
+      <div class="row one">
+        <label class="f"><span>정합성 검증자</span><input type="text" id="f_intby">
+          <div class="hint">스키마 변경이 「해당」이면 검증 결과와 검증자가 모두 필요합니다. 「없음」이면 검증 칸은 비워둡니다.</div></label>
+      </div>
+    </fieldset>
+    <fieldset class="fs"><legend>상태 및 예외</legend>
+      <div class="row">
+        <label class="f"><span>증적 상태</span><select id="f_state"><option>작성중</option><option>등록완료</option><option>보완필요</option><option>예외승인</option><option>해당없음</option></select></label>
+        <label class="f"><span>예외 승인자</span><input type="text" id="f_exc" placeholder="기한 초과 · 축약 시"></label>
+      </div>
+      <div class="row one"><label class="f"><span>비고</span><textarea id="f_memo" rows="2"></textarea></label></div>
+    </fieldset>
+  </div>
+  <footer>
+    <button class="btn danger" id="dDel" hidden>삭제</button>
+    <button class="btn ghost" id="dCancel">취소</button>
+    <button class="btn" id="dSave">저장</button>
+  </footer>
+</aside>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ══════════════ 버전 ══════════════ */
+/* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
+   작성·판정된 기록인지 추적하기 위한 값입니다. */
+const APP_VERSION='1.0.0';
+
+/* ══════════════ 저장소 ══════════════ */
+const KEY='qa-ledger-v1', KEY2='qa-check-v1';
+const mem={};
+const store={
+  async get(k){
+    try{ if(window.storage){const r=await window.storage.get(k); return r?JSON.parse(r.value):null;} }catch(e){}
+    try{ const v=localStorage.getItem(k); return v?JSON.parse(v):null; }catch(e){}
+    return mem[k]??null;
+  },
+  async set(k,v){
+    const s=JSON.stringify(v);
+    try{ if(window.storage){await window.storage.set(k,s); return;} }catch(e){}
+    try{ localStorage.setItem(k,s); return; }catch(e){}
+    mem[k]=v;
+  }
+};
+
+let DATA=[], HIST=[], CHK={}, editing=null;
+
+/* ══════════════ 판정 엔진 ══════════════ */
+const CODE={'정규':'R','수시':'A','핫픽스':'E'};
+const OFFSET={'정규':0,'수시':3,'핫픽스':2};
+const pad=n=>String(n).padStart(2,'0');
+const ymd=d=>d?`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`:'';
+const parse=s=>s?new Date(s+'T00:00:00'):null;
+
+function workday(dateStr,n){
+  const d=parse(dateStr); if(!d) return null;
+  let left=n;
+  while(left>0){ d.setDate(d.getDate()+1); const w=d.getDay(); if(w!==0&&w!==6) left--; }
+  return d;
+}
+function deadline(r){
+  if(!r.date||!r.type) return null;
+  return OFFSET[r.type]===0?parse(r.date):workday(r.date,OFFSET[r.type]);
+}
+function judge(r){
+  const dl=deadline(r);
+  const v={};
+  v.deadline = dl;
+  v.term = (!dl||!r.reg) ? null : (parse(r.reg)<=dl ? 'ok' : 'bad');
+  v.sod  = (!r.dev||!r.qa) ? null : (r.dev.trim()===r.qa.trim() ? 'bad' : 'ok');
+  v.appr = !r.date ? null : ((!r.appr||!r.apprd) ? 'bad' : 'ok');
+  v.map  = !r.date ? null : (r.state==='해당없음' ? 'na' : (r.id ? 'ok' : 'bad'));
+  if(!r.schema) v.integ=null;
+  else if(r.schema==='없음') v.integ = r.int ? 'bad' : 'na';
+  else if(r.int==='완료'&&r.intby) v.integ='ok';
+  else v.integ='bad';
+  if(!r.id||!r.date||!r.type) v.idc=null;
+  else v.idc = (r.id.slice(3,4)===CODE[r.type] && r.id.slice(5,13)===ymd(parse(r.date))) ? 'ok' : 'bad';
+  v.flag = ['term','sod','appr','map','integ','idc'].some(k=>v[k]==='bad');
+  v.overall = !r.date ? null : (v.flag?'확인필요':'정상');
+  return v;
+}
+const SEG=[['term','기한 준수'],['sod','직무 분리'],['appr','승인 기록'],['map','증적 매핑'],['integ','정합성 확인'],['idc','ID 정합성']];
+const LABEL={
+  term:{ok:'준수',bad:'미준수'}, sod:{ok:'정상',bad:'비정상'}, appr:{ok:'완비',bad:'미완비'},
+  map:{ok:'매핑완료',bad:'매핑미완료',na:'해당없음'}, integ:{ok:'정상',bad:'비정상',na:'미해당'},
+  idc:{ok:'정상',bad:'불일치'}
+};
+function stripHTML(v){
+  return SEG.map(([k,n])=>`<s data-v="${v[k]||''}" title="${n}: ${v[k]?(LABEL[k][v[k]]||''):'미판정'}"></s>`).join('');
+}
+
+/* ══════════════ 대장 ══════════════ */
+const $=id=>document.getElementById(id);
+const esc=s=>(s??'').toString().replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=d=>d?`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`:'';
+
+function filtered(){
+  const q=$('q').value.trim().toLowerCase(), t=$('fType').value, vd=$('fVerdict').value;
+  const f=$('fFrom').value, to=$('fTo').value;
+  return DATA.filter(r=>{
+    if(t&&r.type!==t) return false;
+    if(f&&(!r.date||r.date<f)) return false;
+    if(to&&(!r.date||r.date>to)) return false;
+    if(vd&&judge(r).overall!==vd) return false;
+    if(q){
+      const hay=[r.id,r.sys,r.task,r.dev,r.qa,r.appr,r.judge].join(' ').toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  }).sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.id||'').localeCompare(a.id||''));
+}
+const PT={'통과':'p-ok','조건부 통과':'p-cond','실패(반려)':'p-fail'};
+
+function renderLedger(){
+  const list=filtered(), tb=$('rows');
+  if(!list.length){
+    tb.innerHTML=`<tr><td colspan="14"><div class="empty"><b>표시할 배포 건이 없습니다</b>배포 건을 추가하거나 필터를 초기화하십시오.</div></td></tr>`;
+  } else {
+    tb.innerHTML=list.map(r=>{
+      const v=judge(r);
+      return `<tr class="${v.flag?'flag':''}" data-k="${r.k}">
+        <td><span class="strip">${stripHTML(v)}</span></td>
+        <td class="id">${esc(r.id)||'<span style="color:var(--bad)">미부여</span>'}</td>
+        <td class="d">${esc(r.date)}</td>
+        <td><span class="tag t-${CODE[r.type]||''}">${esc(r.type)}</span></td>
+        <td>${esc(r.sys)}</td><td>${esc(r.task)}</td>
+        <td>${esc(r.dev)}</td><td>${esc(r.qa)}</td>
+        <td>${r.qav?`<span class="tag ${PT[r.qav]||''}">${esc(r.qav)}</span>`:''}</td>
+        <td>${esc(r.appr)}</td><td class="d">${esc(r.reg)}</td>
+        <td class="d">${fmt(v.deadline)}</td><td>${esc(r.state)}</td>
+        <td class="act"><button data-edit="${r.k}">편집</button></td>
+      </tr>`;
+    }).join('');
+  }
+  renderStats(list);
+}
+function renderStats(list){
+  const flags=list.filter(r=>judge(r).flag).length;
+  const byType=t=>list.filter(r=>r.type===t).length;
+  const hold=DATA.filter(r=>r.state==='보완필요').length;
+  $('stats').innerHTML=`
+    <div class="stat"><label>모집단 (필터 적용)</label><b>${list.length}</b><small>건</small></div>
+    <div class="stat ${flags?'hot':'good'}"><label>확인필요</label><b>${flags}</b><small>${flags?'조치 대상':'지적 없음'}</small></div>
+    <div class="stat"><label>정규 / 수시 / 핫픽스</label><b>${byType('정규')}·${byType('수시')}·${byType('핫픽스')}</b><small>유형별 분포</small></div>
+    <div class="stat ${hold?'hot':''}"><label>보완필요 (전체 누적)</label><b>${hold}</b><small>이월 관리</small></div>`;
+}
+
+/* ══════════════ 드로어 ══════════════ */
+const F={date:'f_date',type:'f_type',id:'f_id',sys:'f_sys',judge:'f_judge',task:'f_task',
+  dev:'f_dev',qa:'f_qa',qav:'f_verdict',appr:'f_appr',apprd:'f_apprd',reg:'f_reg',path:'f_path',
+  schema:'f_schema',int:'f_int',intby:'f_intby',state:'f_state',exc:'f_exc',memo:'f_memo'};
+
+function readForm(){
+  const r={}; for(const k in F) r[k]=$(F[k]).value.trim();
+  r.k=editing?editing.k:'r'+Date.now()+Math.random().toString(36).slice(2,6);
+  return r;
+}
+function paintVerdict(){
+  const v=judge(readForm());
+  $('dStrip').innerHTML=stripHTML(v);
+  $('dVerdict').innerHTML=SEG.map(([k,n])=>{
+    const s=v[k], cls=s==='ok'?'v-ok':s==='bad'?'v-bad':'v-na';
+    return `<div><span style="color:var(--ink-3)">${n}</span><span class="${cls}">${s?(LABEL[k][s]||''):'—'}</span></div>`;
+  }).join('')+`<div style="border-top:1px solid var(--line);padding-top:6px;margin-top:3px">
+    <span style="color:var(--ink-2)">등록 기한</span><span>${fmt(v.deadline)||'—'}</span></div>`;
+}
+function autoId(){
+  const d=$('f_date').value, t=$('f_type').value;
+  if(!d||!t) return;
+  const cur=$('f_id').value.trim();
+  const pre=`QA-${CODE[t]}-${ymd(parse(d))}-`;
+  if(cur && cur.startsWith(pre)) return;
+  const used=DATA.filter(r=>r.k!==(editing?.k)&&r.id?.startsWith(pre))
+    .map(r=>parseInt(r.id.slice(-2),10)).filter(n=>!isNaN(n));
+  $('f_id').value=pre+pad((used.length?Math.max(...used):0)+1);
+}
+function openDrawer(rec){
+  editing=rec||null;
+  $('dTitle').textContent=rec?'배포 건 편집':'배포 건 추가';
+  $('dDel').hidden=!rec;
+  for(const k in F) $(F[k]).value=rec?(rec[k]||''):'';
+  if(!rec) $('f_state').value='작성중';
+  paintVerdict();
+  $('scrim').classList.add('on'); $('drawer').classList.add('on');
+  setTimeout(()=>$('f_date').focus(),60);
+}
+function closeDrawer(){ $('scrim').classList.remove('on'); $('drawer').classList.remove('on'); editing=null; }
+
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),1900); }
+
+async function save(){
+  const r=readForm();
+  const miss=[];
+  if(!r.date) miss.push('배포일'); if(!r.type) miss.push('릴리즈 구분');
+  if(!r.sys) miss.push('대상 시스템'); if(!r.judge) miss.push('유형 판정자');
+  if(miss.length) return toast(miss.join(', ')+'을 입력하십시오');
+  if(editing){ DATA=DATA.map(x=>x.k===r.k?r:x); } else { DATA.push(r); }
+  await store.set(KEY,DATA); closeDrawer(); renderLedger(); renderCheck(); toast('저장했습니다');
+}
+async function del(){
+  if(!editing) return;
+  DATA=DATA.filter(x=>x.k!==editing.k);
+  await store.set(KEY,DATA); closeDrawer(); renderLedger(); renderCheck(); toast('삭제했습니다');
+}
+
+/* ══════════════ 월간 점검 ══════════════ */
+const CHECKS=[
+  ['증적 매핑 누락','PC-01','map','증적 문서 ID 미기재. 모집단 1:1 매핑 위반이므로 0건이어야 합니다.',1],
+  ['배포 승인 기록 누락','PC-01','appr','배포 승인자 또는 승인일 미기재. PC-01 승인 요건이므로 0건이어야 합니다.',1],
+  ['직무 분리 위반','PC-01','sod','변경 작성자와 검증 수행자가 동일. 0건이어야 합니다.',1],
+  ['정합성 검증 미이행 · 부적합','PD-02','integ','스키마·데이터 변경 건 중 검증 미실시 또는 부적합. 0건이어야 합니다.',1],
+  ['증적 등록 기한 초과','PC-01','term','예외 승인이 없는 초과 건은 미비 건으로 관리합니다.',1],
+  ['유형 판정자 미기재','PC-01','judge','차등 증적 적용의 근거 부재. 0건이어야 합니다.',1],
+  ['증적 문서 ID 정합성 불일치','PC-01','idc','ID의 유형코드 또는 날짜부가 실제 값과 불일치. 부여 오류 또는 유형 재판정 이력이므로 사유를 확인합니다.',1],
+  ['입력 오류 (항목 간 모순)','PD-02','inputerr','스키마·데이터 변경과 정합성 검증 값이 모순. 통제 위반이 아닌 기재 오류이므로 즉시 정정합니다.',1],
+  ['보완필요 미해소 (전체 누적)','PC-01','hold','반송 후 미해소 건. 과거 기간을 포함한 전체 범위로 집계합니다.',1],
+  ['__split__','','','다음 항목은 지적사항이 아니며, 발생 건의 후속 조치 이행 여부를 확인합니다.',0],
+  ['예외 승인 건','PC-01','exc','예외 승인자 기재 여부와 승인 사유의 타당성을 확인합니다.',0],
+  ['실패(반려) 건','PC-01','fail','재검증 및 보고서 재작성 완료 여부를 확인합니다.',0],
+  ['조건부 통과 건','PC-01','cond','잔여 이슈에 대한 후속 조치 완료 여부를 확인합니다.',0],
+];
+function inPeriod(){
+  const f=$('cFrom').value,t=$('cTo').value;
+  return DATA.filter(r=>r.date&&(!f||r.date>=f)&&(!t||r.date<=t));
+}
+function count(key){
+  const P=inPeriod();
+  if(key==='hold') return DATA.filter(r=>r.state==='보완필요').length;
+  if(key==='judge') return P.filter(r=>!r.judge).length;
+  if(key==='inputerr') return P.filter(r=>r.schema==='없음'&&r.int).length;
+  if(key==='exc') return P.filter(r=>r.state==='예외승인').length;
+  if(key==='fail') return P.filter(r=>r.qav==='실패(반려)').length;
+  if(key==='cond') return P.filter(r=>r.qav==='조건부 통과').length;
+  if(key==='integ') return P.filter(r=>{const v=judge(r);return v.integ==='bad'&&r.schema==='해당';}).length;
+  return P.filter(r=>judge(r)[key]==='bad').length;
+}
+function renderCheck(){
+  const P=inPeriod();
+  $('cLed').value=P.length+' 건';
+  const pop=$('cPop').value;
+  const m=$('cMatch');
+  if(pop===''){ m.className='mres i'; m.textContent='미입력'; }
+  else if(+pop===P.length){ m.className='mres y'; m.textContent='일치'; }
+  else { m.className='mres n'; m.textContent=`불일치 (차이 ${Math.abs(+pop-P.length)}건)`; }
+
+  let defects=0;
+  $('chkRows').innerHTML=CHECKS.map(([name,ctrl,key,crit,isDef])=>{
+    if(name==='__split__') return `<tr class="split"><td colspan="5">[ 확인 항목 ] ${crit}</td></tr>`;
+    const n=count(key);
+    if(isDef&&n>0) defects++;
+    return `<tr class="${isDef&&n>0?'hit':''}">
+      <td>${name}</td><td style="text-align:center;font-size:11px;color:var(--ink-3)">${ctrl}</td>
+      <td class="c">${n}</td><td class="crit">${crit}</td>
+      <td><input type="text" data-fix="${key}" value="${esc(CHK['fix_'+key]||'')}" placeholder="${isDef&&n>0?'조치 내용 필수':''}" style="width:100%"></td></tr>`;
+  }).join('');
+
+  const res=$('cResult');
+  const ok=defects===0;
+  res.className='result '+(ok?'pass':'fail');
+  res.innerHTML=`${ok?'적정 · 지적사항 없음':'보완 필요'}
+    <small>지적 항목 ${defects} · 모집단 ${P.length}건 · 확인필요 ${P.filter(r=>judge(r).flag).length}건</small>`;
+  renderHist();
+}
+function renderHist(){
+  const tb=$('histRows');
+  if(!HIST.length){ tb.innerHTML=`<tr><td colspan="8"><div class="empty" style="padding:26px"><b>점검 이력이 없습니다</b>점검을 마치면 결과를 저장하십시오.</div></td></tr>`; return; }
+  tb.innerHTML=HIST.slice().reverse().map(h=>`<tr>
+    <td class="d">${esc(h.from)} ~ ${esc(h.to)}</td><td class="d">${esc(h.date)}</td>
+    <td>${esc(h.by)}</td><td>${esc(h.app)}</td><td class="c">${h.pop}</td>
+    <td class="c" style="${h.defects?'color:var(--bad);font-weight:700':''}">${h.defects}</td>
+    <td>${h.defects?'보완 필요':'적정'}</td>
+    <td class="act"><button data-hcsv="${h.id}">CSV</button><button data-hdel="${h.id}">삭제</button></td></tr>`).join('');
+}
+function chkSnapshot(){
+  const P=inPeriod();
+  const fixes={};
+  document.querySelectorAll('[data-fix]').forEach(i=>{ fixes[i.dataset.fix]=i.value.trim(); });
+  let defects=0;
+  const items=CHECKS.filter(c=>c[0]!=='__split__').map(([name,ctrl,key,crit,isDef])=>{
+    const n=count(key);
+    if(isDef&&n>0) defects++;
+    return {name,ctrl,key,crit,isDef,n,fix:fixes[key]||''};
+  });
+  return {
+    from:$('cFrom').value, to:$('cTo').value, date:$('cDate').value,
+    by:$('cBy').value.trim(), app:$('cApp').value.trim(),
+    popCount:$('cPop').value, ledCount:P.length, popNote:$('cPopNote').value,
+    sample:$('cSample').value, opinion:$('cOpinion').value,
+    flagged:P.filter(r=>judge(r).flag).length,
+    items, defects
+  };
+}
+function csvEscape(rows){
+  return '\uFEFF'+rows.map(r=>r.map(c=>`"${(c??'').toString().replace(/"/g,'""')}"`).join(',')).join('\r\n');
+}
+function exportCheckCSV(snap){
+  const s=snap||chkSnapshot();
+  if(!s.from||!s.to) return toast('점검 대상 기간을 입력하십시오');
+  const match = s.popCount===''||s.popCount===undefined ? '미입력'
+    : (Number(s.popCount)===s.ledCount ? '일치' : `불일치 (차이 ${Math.abs(Number(s.popCount)-s.ledCount)}건)`);
+  const R=[];
+  R.push(['월간 점검 기록']);
+  R.push(['점검 대상 통제','PC-01 애플리케이션 변경 승인 및 개발자/사용자 테스트 · PD-02 데이터 정합성 테스트']);
+  R.push(['점검 근거','릴리즈 유형별 QA/QC 증적 수립 표준 가이드라인 5항']);
+  R.push(['점검 주체','QA유닛 (통제부서)']);
+  R.push(['점검 방법','대장 전수 검토 및 배포 이력(GitHub RELEASE 머지 PR 목록) 대조']);
+  R.push(['점검 대상 기간 (배포일 기준)',`${s.from} ~ ${s.to}`]);
+  R.push(['점검 수행일',s.date]);
+  R.push(['점검자',s.by]);
+  R.push(['확인자',s.app]);
+  R.push([]);
+  R.push(['1. 모집단 완전성 확인']);
+  R.push(['구분','건수']);
+  R.push(['배포 이력 건수 (GitHub RELEASE 머지 PR)',s.popCount]);
+  R.push(['대장 기재 건수',s.ledCount]);
+  R.push(['일치 여부',match]);
+  R.push(['차이 원인 및 조치',s.popNote]);
+  R.push([]);
+  R.push(['2. 점검 항목별 결과']);
+  R.push(['구분','점검 항목','관련 통제','건수','판단 기준','조치 내용']);
+  s.items.forEach(it=>R.push([it.isDef?'지적 항목':'확인 항목',it.name,it.ctrl,it.n,it.crit,it.fix]));
+  R.push([]);
+  R.push(['3. 표본 재검토',s.sample]);
+  R.push([]);
+  R.push(['4. 점검 결과']);
+  R.push(['모집단 건수',s.ledCount]);
+  R.push(['확인필요 건수',s.flagged]);
+  R.push(['지적 항목 수',s.defects]);
+  R.push(['점검 결과',s.defects?'보완 필요':'적정 (지적사항 없음)']);
+  R.push(['점검자 의견',s.opinion]);
+  R.push([]);
+  R.push(['구분','성명','일자']);
+  R.push(['점검자 (QA유닛)',s.by,s.date]);
+  R.push(['확인자 (QA유닛 책임자)',s.app,'']);
+  R.push([]);
+  R.push(['※ 본 점검은 통제부서(QA유닛)의 자체 점검이며, 통제검토부서(TA유닛)의 검토와는 별개의 절차이다.']);
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csvEscape(R)],{type:'text/csv'}));
+  a.download=`QA-MC-${s.from.slice(0,7)}_월간점검.csv`; a.click();
+  toast('점검 결과 CSV를 내보냈습니다');
+}
+async function saveCheck(){
+  if(!$('cFrom').value||!$('cTo').value) return toast('점검 대상 기간을 입력하십시오');
+  if(!$('cDate').value||!$('cBy').value.trim()) return toast('점검 수행일과 점검자를 입력하십시오');
+  let defects=0;
+  CHECKS.forEach(([n,c,k,,isDef])=>{ if(n!=='__split__'&&isDef&&count(k)>0) defects++; });
+  const fixes={};
+  document.querySelectorAll('[data-fix]').forEach(i=>{ if(i.value.trim()) fixes['fix_'+i.dataset.fix]=i.value.trim(); });
+  if(defects>0){
+    const missing=CHECKS.filter(([n,c,k,,d])=>n!=='__split__'&&d&&count(k)>0&&!fixes['fix_'+k]);
+    if(missing.length) return toast('지적 항목의 조치 내용을 기재하십시오');
+  }
+  const snap=chkSnapshot();
+  HIST.push({id:'h'+Date.now(),pop:snap.ledCount,defects,...snap});
+  CHK={...CHK,...fixes};
+  await store.set(KEY2,{hist:HIST,chk:CHK});
+  renderHist(); toast('점검 결과를 저장했습니다');
+}
+
+/* ══════════════ 기준 ══════════════ */
+const DEF_IN=[
+ ['증적 문서 ID','QA-{유형코드}-{배포일 YYYYMMDD}-{일련 2자리}   예) QA-A-20260813-01\n유형코드 R(정규) / A(수시) / E(핫픽스). 일련번호는 같은 배포일·같은 유형 내에서 01부터 부여합니다.\n날짜부는 배포일과 일치시킵니다. 불일치 시 ID 정합성이 「불일치」로 표기됩니다.\n유형 판정 확정 후 부여하며, 이후 유형이 변경되어도 ID는 바꾸지 않습니다. 실제 유형은 릴리즈 구분에 따릅니다.\n보고서 본문과 게시글 제목에 동일 ID를 표기합니다. 제목 표기는 ID로 증적을 검색하기 위한 필수 요건입니다.'],
+ ['배포일','실제 운영 반영일. 배포 이력(GitHub RELEASE 머지 PR)과 일치해야 합니다. 월간 점검의 집계 기준일입니다.'],
+ ['릴리즈 구분','정규 / 수시 / 핫픽스를 배포 요청 시점에 판정합니다.\n다음 중 하나라도 해당하면 일감 건수와 무관하게 정규로 취급합니다 — DB 스키마 변경 또는 데이터 마이그레이션, 인증·권한·과금 로직 변경, 외부 연동 규격 변경, 신규 화면 또는 신규 기능 추가, 다수 일감 묶음 배포 또는 서비스 개편.'],
+ ['유형 판정자','릴리즈 유형을 판정한 담당자. 차등 증적 적용의 정당성 근거이므로 공란으로 두지 않습니다. 판정 근거는 QA 완료 보고서에 기재합니다.'],
+ ['대상 시스템','배포가 반영된 서비스·시스템명. In-scope 대상 여부의 판정 기준입니다. 리포지토리 단위로 배포되는 경우 리포지토리명을 함께 적어 배포 이력과 대조 가능하게 합니다.'],
+ ['일감 / 릴리즈 식별자','유형별로 관리 단위가 달라 기재 형식도 다릅니다.\n· 정규 — 릴리즈 회차 또는 프로젝트명 (예: 2026-08 정기 릴리즈)\n· 수시 — COW 일감 번호 (예: COW #20163). URL이 아닌 식별자로 기재합니다.\n· 핫픽스 — 조치 내용 요약. 별도 식별자가 없으므로 증적 문서 ID로 식별하고 게시글 위치는 등록 경로에 적습니다.'],
+ ['변경 작성자 / 검증 수행자','동일인일 수 없습니다. QA유닛이 검증하지 않는 경우 변경 작성자 이외의 개발자가 교차 검증합니다.\n판정이 문자열 비교이므로 같은 사람을 다르게 표기하지 않도록 표기를 통일합니다.'],
+ ['QA 판정','통과 / 조건부 통과 / 실패(반려). 통과는 검증 수행자, 조건부 통과와 실패는 QA유닛 리더가 판정합니다.\n조건부 통과는 잔여 이슈와 후속 조치 계획이 보고서에 명시된 경우에만 사용합니다.'],
+ ['배포 승인자 / 배포 승인일','PC-01의 승인 요건에 해당하는 필수 항목입니다. 「미확인」 표기는 사용하지 않습니다.\nGitHub PR 머지 기록(Merged by)이 있으면 그 값을 기준으로 기재합니다. 배포 승인자는 검증 수행자와 분리하는 것을 원칙으로 합니다.'],
+ ['스키마 · 데이터 변경','DB 스키마 변경 또는 데이터 마이그레이션 포함 여부. 「해당」이면 유형 판정 기준 제1호에 따라 정규로 취급하며 정합성 검증이 필수입니다.'],
+ ['정합성 검증 / 검증자','PD-02 대응 항목. 완료 / 부적합 / 미실시로 기재하고, 스키마·데이터 변경이 「없음」인 건은 비워둡니다.\n검증 수행은 개발 5유닛, 이행 여부의 확인은 QA유닛이 합니다.'],
+ ['증적 등록일 / 등록 경로','보고서를 아카이빙 채널에 등록한 날짜와 위치. 등록일은 기한 준수 판정의 기준값입니다.\n증적 내용을 링크로 대체하는 것은 금지되나, 증적의 소재를 표시하는 경로 기재는 이에 해당하지 않습니다.'],
+ ['증적 상태','작성중 / 등록완료 / 보완필요 / 예외승인 / 해당없음.\n· 등록완료는 작성자가 아닌 QA유닛이 확인 후 지정합니다.\n· 해당없음은 소스코드 변경이 없는 배포로 증적 대상이 아닌 건이며 사유를 비고에 적습니다.'],
+ ['예외 승인자','등록 기한을 초과하거나 증적 항목을 축약한 경우 승인자를 기재합니다. 승인 권한자는 QA유닛 책임자입니다.\n이상이 없는 건에는 적지 않습니다. 초과·축약이 발생했음에도 공란인 건은 미비 건으로 관리합니다.'],
+];
+const DEF_FX=[
+ ['등록 기한','정규 = 배포일 (배포 승인 요청 전 작성)\n수시 = 배포일 + 3영업일\n핫픽스 = 배포일 + 2영업일'],
+ ['기한 준수','증적 등록일이 등록 기한 이내면 준수, 초과하면 미준수.'],
+ ['직무 분리','변경 작성자와 검증 수행자가 다르면 정상, 같으면 비정상.'],
+ ['승인 기록','배포 승인자와 승인일이 모두 있으면 완비, 하나라도 비면 미완비. PC-01 승인 요건입니다.'],
+ ['증적 매핑','증적 문서 ID가 있으면 매핑완료, 없으면 매핑미완료. 증적 상태가 「해당없음」이면 해당없음.'],
+ ['정합성 확인','스키마 변경 「해당」 + 검증 「완료」 + 검증자 기재 → 정상\n스키마 변경 「해당」 + 검증 「부적합」·「미실시」 또는 검증자 공란 → 비정상\n스키마 변경 「없음」 + 검증 공란 → 미해당\n스키마 변경 「없음」인데 검증값이 있으면 → 비정상 (기재 오류이며 월간 점검에서 입력 오류로 분리 집계)'],
+ ['ID 정합성','증적 문서 ID의 유형코드가 릴리즈 구분과 일치하고 날짜부가 배포일과 일치하면 정상, 그 외는 불일치.\n부여 오류 또는 유형 재판정 이력일 수 있으므로 사유를 확인해 비고에 남깁니다.'],
+ ['판정 스트립 / 종합 판정','여섯 항목 중 하나라도 이상값이면 그 행은 확인필요로 분류되고 붉게 표시됩니다.\n판정은 입력값에서 계산되며 직접 수정할 수 없습니다. 값을 임의로 정할 수 있으면 통제의 신뢰성이 사라집니다.'],
+];
+const SCOPE=[
+ ['1. 요약 및 QA 판정','필수','필수','필수'],
+ ['배포 승인 기록 (승인자 · 승인일)','필수','필수','필수 (사후 승인 시 그 사실 기재)'],
+ ['2. 프로젝트 관리 카드','필수','미적용','미적용'],
+ ['3. 테스트 수행자','필수','필수','필수'],
+ ['4. 테스트 기간 (기획서 리뷰 포함)','필수','미적용','미적용'],
+ ['5. 프로젝트 문서 (SRS · SDS)','필수','해당 시','미적용'],
+ ['7. 테스트 환경','필수','필수','필수'],
+ ['8. 테스트 결과','필수','필수 (간소)','필수 (간소)'],
+ ['9. QA 결과 (유형별 · 우선순위별)','필수','해당 시','해당 시'],
+ ['데이터 정합성 검증 결과','해당 시','해당 시','해당 시'],
+ ['사후 검증 여부 표기','미적용','해당 시','필수'],
+];
+const OPS=[
+ ['모집단','이 대장의 목록 전체가 PC-01 모집단입니다. 배포 이력 전수를 기재하고 정규·수시·핫픽스를 통합 관리합니다.'],
+ ['관리 주체','대장은 QA유닛이 관리합니다. 보고서 작성 주체는 검증 수행 유닛이며, 증적 상태의 확인과 갱신은 작성자가 아닌 QA유닛이 수행합니다.'],
+ ['입력 시작점','대장 입력은 보고서 등록 시점이 아니라 배포 이력을 기준으로 시작합니다. 배포 이력에서 건을 먼저 만들고 대응 보고서를 찾아 증적 문서 ID를 채웁니다. 보고서가 없는 건이 곧 미비 건입니다.'],
+ ['기재 범위','보고서에만 있고 전수 점검이 필요하지 않은 값(총 이슈 건수, 판정일, 판정 근거 등)은 대장에 기재하지 않습니다. 대장은 증적 색인이자 모니터링 도구이며 보고서 요약본이 아닙니다.'],
+ ['증적 무결성','보고서는 등록 후 본문과 제목을 임의로 수정하지 않습니다. 제목의 증적 문서 ID가 바뀌면 대장과의 매핑이 끊깁니다. 정정 시 버전을 갱신해 재등록하고 이전 버전을 함께 보관합니다.'],
+ ['월간 점검','월 1회 점검하고 지적사항이 없어도 이력을 남깁니다. 집계 기간은 배포일 기준이며, 점검 수행일은 기간 말 배포 건의 등록 기한이 지난 익월 초로 정합니다.'],
+ ['모집단 대조','월간 점검 시 GitHub RELEASE 머지 PR 목록과 대장 건수를 대조해 모집단 완전성을 확인합니다.'],
+ ['표본 재검토','QA유닛이 직접 검증하지 않은 건은 점검 시 일부를 표본으로 선정해 증적의 적정성을 재검토하고 결과를 기록합니다.'],
+ ['시행일','시행일 이전 배포 건은 관리 대상이 아니며, 소급 보완 범위는 별도 결정해 기록합니다.'],
+];
+function renderStd(){
+  const acc=(el,arr)=>$(el).innerHTML=arr.map(([t,d])=>
+    `<details><summary>${t}</summary><div class="dd">${d}</div></details>`).join('');
+  acc('defIn',DEF_IN); acc('defFx',DEF_FX); acc('defOps',OPS);
+  $('scopeRows').innerHTML=SCOPE.map(r=>`<tr><td>${r[0]}</td>
+    ${r.slice(1).map(c=>`<td style="text-align:center;font-size:11.5px;${c.startsWith('미적용')?'color:var(--ink-3)':''}">${c}</td>`).join('')}</tr>`).join('');
+}
+
+/* ══════════════ CSV ══════════════ */
+const CSVH=['증적 문서 ID','배포일','릴리즈 구분','유형 판정자','대상 시스템','일감/릴리즈 식별자',
+ '변경 작성자','검증 수행자','QA 판정','배포 승인자','배포 승인일','스키마·데이터 변경','정합성 검증',
+ '정합성 검증자','증적 등록일','증적 등록 경로','증적 상태','등록 기한','기한 준수','직무 분리',
+ '승인 기록','증적 매핑','정합성 확인','ID 정합성','종합 판정','예외 승인자','비고'];
+function exportCSV(){
+  const rows=filtered().map(r=>{
+    const v=judge(r);
+    const L=k=>v[k]?(LABEL[k][v[k]]||''):'';
+    return [r.id,r.date,r.type,r.judge,r.sys,r.task,r.dev,r.qa,r.qav,r.appr,r.apprd,
+      r.schema,r.int,r.intby,r.reg,r.path,r.state,fmt(v.deadline),
+      L('term'),L('sod'),L('appr'),L('map'),L('integ'),L('idc'),v.overall||'',r.exc,r.memo];
+  });
+  const csv='\uFEFF'+[CSVH,...rows].map(r=>r.map(c=>`"${(c??'').toString().replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=`배포관리대장_${fmt(new Date())}.csv`; a.click();
+  toast('CSV를 내보냈습니다');
+}
+
+/* ══════════════ 부팅 ══════════════ */
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.setAttribute('aria-current',x===b));
+  const v=b.dataset.v;
+  $('v-ledger').hidden=v!=='ledger'; $('v-check').hidden=v!=='check'; $('std').hidden=v!=='std';
+  if(v==='check') renderCheck();
+});
+$('add').onclick=()=>openDrawer(null);
+$('exp').onclick=exportCSV;
+$('dClose').onclick=$('dCancel').onclick=closeDrawer;
+$('scrim').onclick=closeDrawer;
+$('dSave').onclick=save;
+$('dDel').onclick=del;
+$('rows').addEventListener('click',e=>{
+  const k=e.target.dataset.edit; if(k) openDrawer(DATA.find(r=>r.k===k));
+});
+$('histRows').addEventListener('click',async e=>{
+  const cid=e.target.dataset.hcsv;
+  if(cid){ const h=HIST.find(x=>x.id===cid); if(h) exportCheckCSV(h); return; }
+  const id=e.target.dataset.hdel; if(!id) return;
+  HIST=HIST.filter(h=>h.id!==id); await store.set(KEY2,{hist:HIST,chk:CHK}); renderHist(); toast('이력을 삭제했습니다');
+});
+['q','fType','fVerdict','fFrom','fTo'].forEach(id=>$(id).addEventListener('input',renderLedger));
+$('fClear').onclick=()=>{['q','fType','fVerdict','fFrom','fTo'].forEach(id=>$(id).value='');renderLedger()};
+Object.values(F).forEach(id=>$(id).addEventListener('input',()=>{
+  if(id==='f_date'||id==='f_type') autoId();
+  paintVerdict();
+}));
+['cFrom','cTo','cPop'].forEach(id=>$(id).addEventListener('input',renderCheck));
+$('saveChk').onclick=saveCheck;
+$('expChk').onclick=()=>exportCheckCSV();
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeDrawer(); });
+
+(async()=>{
+  $('build').textContent='v'+APP_VERSION;
+  DATA=(await store.get(KEY))||[];
+  const c=await store.get(KEY2); if(c){HIST=c.hist||[];CHK=c.chk||{};}
+  const now=new Date(), first=new Date(now.getFullYear(),now.getMonth()-1,1), last=new Date(now.getFullYear(),now.getMonth(),0);
+  $('cFrom').value=fmt(first); $('cTo').value=fmt(last); $('cDate').value=fmt(now);
+  renderLedger(); renderStd(); renderCheck();
+})();
+</script>
+</body>
+</html>

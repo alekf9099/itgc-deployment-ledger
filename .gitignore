@@ -1,0 +1,23 @@
+# Vercel
+.vercel/
+
+# 의존성 / 빌드 산출물
+node_modules/
+dist/
+
+# OS / 편집기
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# 로컬 설정
+.claude/settings.local.json
+.env
+.env.*
+
+# 대장에서 내보낸 CSV (증적은 아카이빙 채널에 등록하며 리포지토리에 커밋하지 않습니다)
+*.csv
+~$*.xlsx
