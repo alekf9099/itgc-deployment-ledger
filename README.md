@@ -7,6 +7,9 @@ QA유닛이 운영하는 배포 관리 대장입니다. 배포 이력 전수를 
 - **대상 통제** PC-01 애플리케이션 변경 승인 및 개발자/사용자 테스트, PD-02 데이터 정합성 테스트
 - **근거** 「릴리즈 유형별 QA/QC 증적 수립 표준 가이드라인」
 
+화면별 사용 방법은 **[사용 안내서](docs/USER_GUIDE.md)** 를 보십시오.
+담당자 교육과 감사 대응 시 이 문서를 사용합니다.
+
 원본 엑셀 대장은 [`docs/QA-LG-001_Release_Deployment_Ledger.xlsx`](docs/QA-LG-001_Release_Deployment_Ledger.xlsx)
 에 보관합니다. 웹 버전이 이 양식을 대체하며, 양식이 개정되면 원본과 화면을 함께 갱신합니다.
 
@@ -67,6 +70,8 @@ QA유닛이 운영하는 배포 관리 대장입니다. 배포 이력 전수를 
 | `scripts/migrate.mjs` | 스키마 적용 |
 | `scripts/create-user.mjs` | 계정 생성 · 비밀번호 재설정 |
 | `scripts/check.mjs` | `index.html` 정합성 검사 (CI에서 실행) |
+| `docs/USER_GUIDE.md` | 화면별 사용 안내서 |
+| `docs/QA-LG-001_…xlsx` | 원본 엑셀 대장 |
 
 ---
 
