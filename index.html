@@ -246,6 +246,19 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 .st{display:inline-block;font-family:var(--mono);font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:20px}
 .st.on{background:var(--ok-bg);color:var(--ok)} .st.off{background:var(--line-2);color:var(--ink-3)}
 
+/* ─────────── 로딩 스켈레톤 ─────────── */
+/* 불러오는 동안 표가 비어 보이면 데이터가 없는 것과 구분되지 않습니다.
+   들어올 내용의 형태를 미리 보여줍니다. */
+.sk{display:inline-block;height:11px;border-radius:5px;vertical-align:middle;
+  background:linear-gradient(90deg,#E6EAF0 25%,#F3F6F9 37%,#E6EAF0 63%);
+  background-size:400% 100%;animation:skl 1.3s ease-in-out infinite}
+@keyframes skl{0%{background-position:100% 50%}100%{background-position:0 50%}}
+/* 동작 최소화 설정에서는 애니메이션이 꺼지므로 정지된 회색 블록으로 남습니다. */
+.sk.b{height:22px;border-radius:6px}
+.sk.s{height:9px}
+.stat .sk{display:block}
+.skline{display:grid;gap:9px}
+
 /* ─────────── 공지 ─────────── */
 #notice{display:grid;gap:8px;margin-bottom:18px}
 #notice:empty{display:none}
@@ -676,7 +689,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.3.0';
+const APP_VERSION='2.4.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -746,6 +759,26 @@ const LABEL={
 function stripHTML(v){
   return SEG.map(([k,n])=>`<s data-v="${v[k]||''}" title="${n}: ${v[k]?(LABEL[k][v[k]]||''):'미판정'}"></s>`).join('');
 }
+
+/* ══════════════ 로딩 스켈레톤 ══════════════ */
+const sk=(w,cls='')=>`<span class="sk ${cls}" style="width:${w}px"></span>`;
+const skRows=(widths,n)=>Array.from({length:n},()=>
+  `<tr>${widths.map(w=>`<td>${sk(w)}</td>`).join('')}</tr>`).join('');
+const skStats=n=>Array.from({length:n},()=>
+  `<div class="stat">${sk(58,'s')}${sk(46,'b')}${sk(72,'s')}</div>`).join('');
+/* 문단형 영역용. 아래로 갈수록 짧게 두어 글 덩어리처럼 보이게 합니다. */
+const skLines=(n,base=240)=>`<div class="skline">${
+  Array.from({length:n},(_,i)=>sk(Math.max(90,base-i*38))).join('')}</div>`;
+
+/* 표 열 폭에 맞춘 스켈레톤 폭. 실제 값과 비슷한 길이로 두어 로딩 후 흔들림을 줄입니다. */
+const SK_LEDGER=[52,86,62,38,104,78,48,48,54,48,62,62,50,26];
+const SK_LOG=[104,64,62,116,180];
+const SK_USERS=[138,58,58,86,44,96,74,112];
+const SK_TABLES=[120,60,58,150];
+const SK_EXPORTS=[104,68,190];
+
+function skOn(el,html){ el.setAttribute('aria-busy','true'); el.innerHTML=html; }
+function skOff(el){ el.removeAttribute('aria-busy'); }
 
 /* ══════════════ 대장 ══════════════ */
 const $=id=>document.getElementById(id);
@@ -884,7 +917,7 @@ $('regToday').onclick=()=>{ $('f_reg').value=fmt(new Date()); paintVerdict(); };
    대장 값만 보면 언제 누가 고쳤는지 알 수 없어, 편집 화면에서 바로 확인하게 합니다. */
 async function loadEntryHist(rec){
   const box=$('dHist');
-  box.innerHTML='<span style="color:var(--ink-3)">불러오는 중…</span>';
+  skOn(box,skLines(3,200));
   const meta=rec._meta||{};
   const head=[
     meta.createdBy?`<div>최초 등록 <b>${esc(meta.createdBy)}</b> · ${esc(when(meta.createdAt))}</div>`:'',
@@ -898,8 +931,9 @@ async function loadEntryHist(rec){
         ${changeHTML(l.changed)}
       </div>`).join('')
       :'<div style="color:var(--ink-3);margin-top:7px">기록된 변경이 없습니다.</div>';
-    box.innerHTML=head+body;
+    skOff(box); box.innerHTML=head+body;
   }catch(e){
+    skOff(box);
     box.innerHTML=head+'<div style="color:var(--bad);margin-top:7px">이력을 불러오지 못했습니다.</div>';
   }
 }
@@ -1243,11 +1277,12 @@ function exportCSV(){
 /* ══════════════ 변경 이력 화면 ══════════════ */
 async function loadLog(){
   const tb=$('logRows');
-  tb.innerHTML=`<tr><td colspan="5"><div class="empty" style="padding:26px">불러오는 중…</div></td></tr>`;
+  skOn(tb,skRows(SK_LOG,10));
   try{
     const {log}=await api('/api/audit?limit=500');
-    LOG=log; renderLog();
+    LOG=log; skOff(tb); renderLog();
   }catch(e){
+    skOff(tb);
     tb.innerHTML=`<tr><td colspan="5"><div class="empty" style="padding:26px"><b>이력을 불러오지 못했습니다</b>${esc(e.message)}</div></td></tr>`;
   }
 }
@@ -1288,10 +1323,24 @@ function bytes(n){
 }
 
 async function loadStorage(){
+  /* 저장소 화면이 열려 있지 않을 때도 공지 때문에 호출되므로, 스켈레톤은
+     화면이 실제로 보일 때만 표시합니다. */
+  const visible=!$('v-storage').hidden;
+  if(visible&&!STORE){
+    skOn($('stStats'),skStats(4));
+    skOn($('stTables'),skRows(SK_TABLES,5));
+    skOn($('stTrend'),skLines(3));
+    $('stGmeta').innerHTML=`${sk(90,'s')}${sk(150,'s')}`;
+  }
   try{
     STORE=await api('/api/storage');
+    [$('stStats'),$('stTables'),$('stTrend')].forEach(skOff);
     renderStorage(); renderNotice();
   }catch(e){
+    [$('stStats'),$('stTables'),$('stTrend')].forEach(skOff);
+    $('stStats').innerHTML='';
+    $('stGmeta').innerHTML='';
+    $('stTrend').innerHTML='';
     $('stTables').innerHTML=`<tr><td colspan="4" style="color:var(--bad)">사용량을 불러오지 못했습니다. ${esc(e.message)}</td></tr>`;
   }
 }
@@ -1349,15 +1398,18 @@ function renderStorage(){
 /* 반출 이력은 변경 이력에서 export.* 기록만 뽑아 보여줍니다. */
 async function loadExports(){
   const tb=$('stExports');
+  skOn(tb,skRows(SK_EXPORTS,3));
   try{
     const {log}=await api('/api/audit?limit=500');
     const list=log.filter(l=>l.action.startsWith('export.'));
+    skOff(tb);
     tb.innerHTML=list.length
       ? list.slice(0,30).map(l=>`<tr>
           <td class="c" style="font-family:var(--mono);font-size:11.5px">${esc(when(l.at))}</td>
           <td>${esc(l.actor_name||l.actor)}</td><td>${esc(l.note||'')}</td></tr>`).join('')
       : `<tr><td colspan="3" style="color:var(--ink-3)">반출 기록이 없습니다. 대장을 내보내면 자동으로 기록됩니다.</td></tr>`;
   }catch(e){
+    skOff(tb);
     tb.innerHTML=`<tr><td colspan="3" style="color:var(--bad)">이력을 불러오지 못했습니다.</td></tr>`;
   }
 }
@@ -1413,11 +1465,12 @@ const ROLELABEL={admin:'관리자',member:'작성 권한',viewer:'열람 전용'
 
 async function loadUsers(){
   const tb=$('uRows');
-  tb.innerHTML=`<tr><td colspan="8"><div class="empty" style="padding:26px">불러오는 중…</div></td></tr>`;
+  skOn(tb,skRows(SK_USERS,5));
   try{
     const {users}=await api('/api/users');
-    USERS=users; renderUsers();
+    USERS=users; skOff(tb); renderUsers();
   }catch(e){
+    skOff(tb);
     tb.innerHTML=`<tr><td colspan="8"><div class="empty" style="padding:26px"><b>계정 목록을 불러오지 못했습니다</b>${esc(e.message)}</div></td></tr>`;
   }
 }
@@ -1623,10 +1676,19 @@ async function boot(){
   $('cFrom').value=fmt(first); $('cTo').value=fmt(last); $('cDate').value=fmt(now);
   if(!ro && !$('cBy').value) $('cBy').value=ME.name;
 
+  /* 대장을 불러오는 동안 빈 표가 보이면 "배포 건이 없음"과 구분되지 않습니다. */
+  skOn($('stats'),skStats(4));
+  skOn($('rows'),skRows(SK_LEDGER,8));
+
   try{
     const [e,c]=await Promise.all([api('/api/entries'),api('/api/checks')]);
     DATA=e.entries; HIST=c.hist||[]; CHK=c.draft||{};
-  }catch(err){ fail(err); return; }
+  }catch(err){
+    [$('stats'),$('rows')].forEach(skOff);
+    $('stats').innerHTML=''; $('rows').innerHTML='';
+    fail(err); return;
+  }
+  [$('stats'),$('rows')].forEach(skOff);
 
   renderLedger(); renderStd(); renderCheck();
 
