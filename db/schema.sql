@@ -57,6 +57,13 @@ CREATE TABLE IF NOT EXISTS entries (
 CREATE INDEX IF NOT EXISTS entries_deploy_date_idx ON entries (deploy_date DESC);
 CREATE INDEX IF NOT EXISTS entries_active_idx      ON entries (deleted_at) WHERE deleted_at IS NULL;
 
+-- 증적 문서 ID 는 증적과 배포 건을 1:1 로 잇는 값이므로 중복될 수 없습니다.
+-- 일련번호를 화면에서 계산하기 때문에, 두 담당자가 같은 배포일·같은 유형을
+-- 동시에 등록하면 같은 ID 가 만들어질 수 있어 DB 에서 막습니다.
+-- 대장에서 제외된 건은 대상에서 빼, 같은 ID 로 다시 등록할 수 있게 둡니다.
+CREATE UNIQUE INDEX IF NOT EXISTS entries_doc_id_uniq
+  ON entries (doc_id) WHERE deleted_at IS NULL AND doc_id IS NOT NULL;
+
 -- 월간 점검 이력
 CREATE TABLE IF NOT EXISTS checks (
   id            TEXT PRIMARY KEY,
@@ -74,8 +81,15 @@ CREATE TABLE IF NOT EXISTS checks (
   defects       INTEGER,
   items         JSONB       NOT NULL DEFAULT '[]'::jsonb,
   created_by    TEXT        NOT NULL,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  deleted_by    TEXT,
+  deleted_at    TIMESTAMPTZ                     -- NULL 이 아니면 이력에서 제외된 점검
 );
+
+-- 점검 이력도 배포 건과 같이 실제로 지우지 않습니다. 이력의 연속성이 통제
+-- 운영의 증거이므로, 지워진 사실만 남고 내용이 사라지면 확인할 수 없습니다.
+ALTER TABLE checks ADD COLUMN IF NOT EXISTS deleted_by TEXT;
+ALTER TABLE checks ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
 -- 점검 화면의 조치 내용 임시 저장 (확정 전 초안)
 CREATE TABLE IF NOT EXISTS check_draft (

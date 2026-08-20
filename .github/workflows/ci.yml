@@ -11,11 +11,18 @@ on:
 
 jobs:
   check:
-    name: index.html 정합성 검사
+    name: 정합성 검사 및 판정 검증
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: node scripts/check.mjs
+      - name: index.html 정합성 검사
+        run: node scripts/check.mjs
+      # 판정 규칙과 점검 집계는 통제 결과를 결정하므로 값이 바뀌면 막습니다.
+      - name: 판정 · 점검 집계 검증
+        run: node scripts/test-judge.mjs
+      - name: 서버 코드 문법 검사
+        run: |
+          for f in api/*.js lib/*.js; do node --check "$f"; done

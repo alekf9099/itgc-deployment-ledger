@@ -464,6 +464,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
         <option value="check.save">월간 점검 저장</option>
         <option value="check.delete">월간 점검 삭제</option>
         <option value="login">로그인</option>
+        <option value="login.fail">로그인 실패</option>
         <option value="password.change">비밀번호 변경</option>
       </select>
     </div>
@@ -623,7 +624,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
       </div>
       <div class="row one">
         <label class="f"><span>증적 문서 ID<em>*</em></span><input type="text" id="f_id" placeholder="QA-유형코드-YYYYMMDD-01">
-          <div class="hint">배포일과 유형을 먼저 고르면 자동 생성됩니다. 보고서 본문과 게시글 제목에 동일하게 표기하십시오.</div></label>
+          <div class="hint" id="idHint">배포일과 유형을 먼저 고르면 자동 생성됩니다. 보고서 본문과 게시글 제목에 동일하게 표기하십시오.</div></label>
       </div>
       <div class="row">
         <label class="f"><span>대상 시스템<em>*</em></span>
@@ -689,7 +690,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.4.0';
+const APP_VERSION='2.5.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -856,7 +857,16 @@ function paintVerdict(){
   }).join('')+`<div style="border-top:1px solid var(--line);padding-top:6px;margin-top:3px">
     <span style="color:var(--ink-2)">등록 기한</span><span>${fmt(v.deadline)||'—'}</span></div>`;
 }
+/* 증적 문서 ID 를 자동으로 채워도 되는 상태인지. 신규 등록에서만 참이고,
+   담당자가 ID 를 직접 고치면 거짓이 됩니다. */
+let idAuto=false;
+
 function autoId(){
+  /* 이미 부여된 ID 는 배포일이나 유형이 바뀌어도 바꾸지 않습니다.
+     작성 기준상 ID 는 유형이 재판정되어도 유지되며, 어긋난 사실은
+     「ID 정합성」이 불일치로 표시해 사유를 확인하게 하는 것이 의도입니다.
+     여기서 덮어쓰면 그 흔적이 사라지고 보고서와의 매핑도 끊깁니다. */
+  if(!idAuto) return;
   const d=$('f_date').value, t=$('f_type').value;
   if(!d||!t) return;
   const cur=$('f_id').value.trim();
@@ -882,6 +892,12 @@ function openDrawer(rec){
   $('dRo').hidden=!ro;
   for(const k in F){ const el=$(F[k]); el.value=rec?(rec[k]||''):''; el.disabled=ro; }
   if(!rec) $('f_state').value='작성중';
+
+  /* 신규 등록에서만 ID 를 자동으로 채웁니다. */
+  idAuto=!rec;
+  $('idHint').textContent=rec
+    ? '이미 부여된 ID 는 배포일·유형을 바꿔도 자동으로 변경되지 않습니다. 어긋나면 「ID 정합성」이 불일치로 표시되므로 사유를 비고에 남기십시오.'
+    : '배포일과 유형을 먼저 고르면 자동 생성됩니다. 보고서 본문과 게시글 제목에 동일하게 표기하십시오.';
 
   const carried=[];
   if(!rec&&!ro){
@@ -938,7 +954,8 @@ async function loadEntryHist(rec){
   }
 }
 const ACT={'entry.create':'등록','entry.update':'수정','entry.delete':'삭제',
-  'check.save':'월간 점검 저장','check.delete':'월간 점검 삭제','login':'로그인','password.change':'비밀번호 변경',
+  'check.save':'월간 점검 저장','check.delete':'월간 점검 삭제',
+  'login':'로그인','login.fail':'로그인 실패','password.change':'비밀번호 변경',
   'user.create':'계정 발급','user.update':'계정 변경','user.reset':'비밀번호 재설정',
   'export.ledger':'대장 반출','export.check':'점검 결과 반출','export.backup':'전체 백업 반출'};
 function when(v){
@@ -971,7 +988,8 @@ async function save(keepOpen){
     const i=DATA.findIndex(x=>x.k===entry.k);
     if(i<0) DATA.push(entry); else DATA[i]=entry;
     LAST={date:entry.date||'',sys:entry.sys||''};
-    renderLedger(); renderCheck();
+    /* 대장이 바뀌었으므로 점검 집계도 다시 받아야 합니다. */
+    renderLedger(); scheduleSummary();
     if(keepOpen){
       openDrawer(null); toast('저장했습니다. 다음 건을 입력하십시오');
     } else {
@@ -988,7 +1006,7 @@ async function del(){
   try{
     await api('/api/entries?k='+encodeURIComponent(editing.k),{method:'DELETE'});
     DATA=DATA.filter(x=>x.k!==editing.k);
-    closeDrawer(); renderLedger(); renderCheck(); toast('대장에서 제외했습니다');
+    closeDrawer(); renderLedger(); scheduleSummary(); toast('대장에서 제외했습니다');
   }catch(e){ fail(e); }
 }
 
@@ -1000,61 +1018,66 @@ function fail(e){
 }
 
 /* ══════════════ 월간 점검 ══════════════ */
-const CHECKS=[
-  ['증적 매핑 누락','PC-01','map','증적 문서 ID 미기재. 모집단 1:1 매핑 위반이므로 0건이어야 합니다.',1],
-  ['배포 승인 기록 누락','PC-01','appr','배포 승인자 또는 승인일 미기재. PC-01 승인 요건이므로 0건이어야 합니다.',1],
-  ['직무 분리 위반','PC-01','sod','변경 작성자와 검증 수행자가 동일. 0건이어야 합니다.',1],
-  ['정합성 검증 미이행 · 부적합','PD-02','integ','스키마·데이터 변경 건 중 검증 미실시 또는 부적합. 0건이어야 합니다.',1],
-  ['증적 등록 기한 초과','PC-01','term','예외 승인이 없는 초과 건은 미비 건으로 관리합니다.',1],
-  ['유형 판정자 미기재','PC-01','judge','차등 증적 적용의 근거 부재. 0건이어야 합니다.',1],
-  ['증적 문서 ID 정합성 불일치','PC-01','idc','ID의 유형코드 또는 날짜부가 실제 값과 불일치. 부여 오류 또는 유형 재판정 이력이므로 사유를 확인합니다.',1],
-  ['입력 오류 (항목 간 모순)','PD-02','inputerr','스키마·데이터 변경과 정합성 검증 값이 모순. 통제 위반이 아닌 기재 오류이므로 즉시 정정합니다.',1],
-  ['보완필요 미해소 (전체 누적)','PC-01','hold','반송 후 미해소 건. 과거 기간을 포함한 전체 범위로 집계합니다.',1],
-  ['__split__','','','다음 항목은 지적사항이 아니며, 발생 건의 후속 조치 이행 여부를 확인합니다.',0],
-  ['예외 승인 건','PC-01','exc','예외 승인자 기재 여부와 승인 사유의 타당성을 확인합니다.',0],
-  ['실패(반려) 건','PC-01','fail','재검증 및 보고서 재작성 완료 여부를 확인합니다.',0],
-  ['조건부 통과 건','PC-01','cond','잔여 이슈에 대한 후속 조치 완료 여부를 확인합니다.',0],
-];
-function inPeriod(){
-  const f=$('cFrom').value,t=$('cTo').value;
-  return DATA.filter(r=>r.date&&(!f||r.date>=f)&&(!t||r.date<=t));
-}
-function count(key){
-  const P=inPeriod();
-  if(key==='hold') return DATA.filter(r=>r.state==='보완필요').length;
-  if(key==='judge') return P.filter(r=>!r.judge).length;
-  if(key==='inputerr') return P.filter(r=>r.schema==='없음'&&r.int).length;
-  if(key==='exc') return P.filter(r=>r.state==='예외승인').length;
-  if(key==='fail') return P.filter(r=>r.qav==='실패(반려)').length;
-  if(key==='cond') return P.filter(r=>r.qav==='조건부 통과').length;
-  if(key==='integ') return P.filter(r=>{const v=judge(r);return v.integ==='bad'&&r.schema==='해당';}).length;
-  return P.filter(r=>judge(r)[key]==='bad').length;
-}
-function renderCheck(){
-  const P=inPeriod();
-  $('cLed').value=P.length+' 건';
-  const pop=$('cPop').value;
-  const m=$('cMatch');
-  if(pop===''){ m.className='mres i'; m.textContent='미입력'; }
-  else if(+pop===P.length){ m.className='mres y'; m.textContent='일치'; }
-  else { m.className='mres n'; m.textContent=`불일치 (차이 ${Math.abs(+pop-P.length)}건)`; }
+/* 점검 항목 정의와 집계는 서버(lib/judge.js)가 가집니다. 화면은 서버가 준
+   값을 그대로 그립니다.
+   정의를 양쪽에 두면 한쪽만 바뀌어 어긋나고, 집계를 화면이 계산해 보내면
+   저장되는 수치를 요청 조작으로 바꿀 수 있습니다. */
+let SUMMARY=null, sumTimer=null;
 
-  let defects=0;
-  $('chkRows').innerHTML=CHECKS.map(([name,ctrl,key,crit,isDef])=>{
-    if(name==='__split__') return `<tr class="split"><td colspan="5">[ 확인 항목 ] ${crit}</td></tr>`;
-    const n=count(key);
-    if(isDef&&n>0) defects++;
-    return `<tr class="${isDef&&n>0?'hit':''}">
-      <td>${name}</td><td style="text-align:center;font-size:11px;color:var(--ink-3)">${ctrl}</td>
-      <td class="c">${n}</td><td class="crit">${crit}</td>
-      <td><input type="text" data-fix="${key}" value="${esc(CHK['fix_'+key]||'')}" placeholder="${isDef&&n>0?'조치 내용 필수':''}" style="width:100%"></td></tr>`;
+/* 기간을 고칠 때마다 요청하지 않도록 잠깐 모아 보냅니다. */
+function scheduleSummary(){
+  clearTimeout(sumTimer);
+  sumTimer=setTimeout(loadSummary,350);
+}
+
+async function loadSummary(){
+  const from=$('cFrom').value, to=$('cTo').value;
+  if(!from||!to){ SUMMARY=null; renderCheck(); return; }
+  skOn($('chkRows'),skRows([150,58,42,220,150],6));
+  try{
+    const r=await api(`/api/checks?from=${from}&to=${to}`);
+    SUMMARY=r.summary||null;
+    if(r.hist) HIST=r.hist;
+    skOff($('chkRows')); renderCheck();
+  }catch(e){
+    skOff($('chkRows'));
+    SUMMARY=null; renderCheck(); fail(e);
+  }
+}
+
+/* 조치 내용은 입력 중인 값을 우선하고, 없으면 서버에 저장된 초안을 씁니다. */
+const fixOf=it=>CHK['fix_'+it.key]??it.fix??'';
+
+function renderCheck(){
+  const s=SUMMARY;
+  $('cLed').value=s?`${s.ledgerCount} 건`:'—';
+
+  const pop=$('cPop').value, m=$('cMatch');
+  if(!s||pop===''){ m.className='mres i'; m.textContent='미입력'; }
+  else if(+pop===s.ledgerCount){ m.className='mres y'; m.textContent='일치'; }
+  else { m.className='mres n'; m.textContent=`불일치 (차이 ${Math.abs(+pop-s.ledgerCount)}건)`; }
+
+  if(!s){
+    $('chkRows').innerHTML=`<tr><td colspan="5" style="color:var(--ink-3);padding:16px">대상 기간을 입력하면 집계됩니다.</td></tr>`;
+    $('cResult').className='result pass';
+    $('cResult').innerHTML='집계 대기 <small>대상 기간을 입력하십시오</small>';
+    renderHist(); return;
+  }
+
+  const ro=readonly();
+  $('chkRows').innerHTML=s.items.map(it=>{
+    if(it.key==='__split__') return `<tr class="split"><td colspan="5">[ 확인 항목 ] ${esc(it.crit)}</td></tr>`;
+    const hit=it.isDef&&it.n>0;
+    return `<tr class="${hit?'hit':''}">
+      <td>${esc(it.name)}</td><td style="text-align:center;font-size:11px;color:var(--ink-3)">${esc(it.ctrl)}</td>
+      <td class="c">${it.n}</td><td class="crit">${esc(it.crit)}</td>
+      <td><input type="text" data-fix="${esc(it.key)}" value="${esc(fixOf(it))}" placeholder="${hit?'조치 내용 필수':''}" style="width:100%"${ro?' disabled':''}></td></tr>`;
   }).join('');
 
-  const res=$('cResult');
-  const ok=defects===0;
-  res.className='result '+(ok?'pass':'fail');
-  res.innerHTML=`${ok?'적정 · 지적사항 없음':'보완 필요'}
-    <small>지적 항목 ${defects} · 모집단 ${P.length}건 · 확인필요 ${P.filter(r=>judge(r).flag).length}건</small>`;
+  const ok=s.defects===0;
+  $('cResult').className='result '+(ok?'pass':'fail');
+  $('cResult').innerHTML=`${ok?'적정 · 지적사항 없음':'보완 필요'}
+    <small>지적 항목 ${s.defects} · 모집단 ${s.ledgerCount}건 · 확인필요 ${s.flagged}건</small>`;
   renderHist();
 }
 function renderHist(){
@@ -1067,23 +1090,21 @@ function renderHist(){
     <td>${h.defects?'보완 필요':'적정'}</td>
     <td class="act"><button data-hcsv="${h.id}">CSV</button><button data-hdel="${h.id}">삭제</button></td></tr>`).join('');
 }
+/* 화면에 입력된 조치 내용을 CHK 로 모읍니다. */
+function collectFixes(){
+  document.querySelectorAll('[data-fix]').forEach(i=>{ CHK['fix_'+i.dataset.fix]=i.value.trim(); });
+}
+
+/* CSV 에 쓰는 현재 화면 상태. 집계 수치는 서버가 계산한 값을 그대로 씁니다. */
 function chkSnapshot(){
-  const P=inPeriod();
-  const fixes={};
-  document.querySelectorAll('[data-fix]').forEach(i=>{ fixes[i.dataset.fix]=i.value.trim(); });
-  let defects=0;
-  const items=CHECKS.filter(c=>c[0]!=='__split__').map(([name,ctrl,key,crit,isDef])=>{
-    const n=count(key);
-    if(isDef&&n>0) defects++;
-    return {name,ctrl,key,crit,isDef,n,fix:fixes[key]||''};
-  });
+  const s=SUMMARY;
   return {
     from:$('cFrom').value, to:$('cTo').value, date:$('cDate').value,
     by:$('cBy').value.trim(), app:$('cApp').value.trim(),
-    popCount:$('cPop').value, ledCount:P.length, popNote:$('cPopNote').value,
+    popCount:$('cPop').value, ledCount:s?s.ledgerCount:0, popNote:$('cPopNote').value,
     sample:$('cSample').value, opinion:$('cOpinion').value,
-    flagged:P.filter(r=>judge(r).flag).length,
-    items, defects
+    flagged:s?s.flagged:0, defects:s?s.defects:0,
+    items:s?s.items.filter(it=>it.key!=='__split__').map(it=>({...it,fix:fixOf(it)})):[]
   };
 }
 function csvEscape(rows){
@@ -1140,22 +1161,25 @@ async function saveCheck(){
   if(readonly()) return toast('열람 전용 계정입니다');
   if(!$('cFrom').value||!$('cTo').value) return toast('점검 대상 기간을 입력하십시오');
   if(!$('cDate').value||!$('cBy').value.trim()) return toast('점검 수행일과 점검자를 입력하십시오');
-  let defects=0;
-  CHECKS.forEach(([n,c,k,,isDef])=>{ if(n!=='__split__'&&isDef&&count(k)>0) defects++; });
-  const fixes={};
-  document.querySelectorAll('[data-fix]').forEach(i=>{ if(i.value.trim()) fixes['fix_'+i.dataset.fix]=i.value.trim(); });
-  if(defects>0){
-    const missing=CHECKS.filter(([n,c,k,,d])=>n!=='__split__'&&d&&count(k)>0&&!fixes['fix_'+k]);
-    if(missing.length) return toast('지적 항목의 조치 내용을 기재하십시오');
-  }
+  if(!SUMMARY) return toast('집계를 불러오는 중입니다. 잠시 후 다시 시도하십시오');
+
+  collectFixes();
+  /* 서버도 같은 검사를 하지만, 저장을 누른 뒤 반려되는 것보다 미리 알리는 편이 낫습니다. */
+  const missing=SUMMARY.items.filter(it=>it.isDef&&it.n>0&&!fixOf(it)).map(it=>it.name);
+  if(missing.length) return toast(`조치 내용을 기재하십시오 — ${missing.join(', ')}`);
+
   const btn=$('saveChk'); btn.disabled=true;
   try{
-    const snap={...chkSnapshot(),defects};
-    const {check}=await api('/api/checks',{method:'POST',body:{snapshot:snap}});
-    HIST.push(check);
-    CHK={...CHK,...fixes};
     await api('/api/checks',{method:'PATCH',body:{draft:CHK}});
-    renderHist(); toast('점검 결과를 저장했습니다');
+    /* 저장되는 집계는 서버가 다시 계산합니다. 화면은 입력값만 보냅니다. */
+    const {check}=await api('/api/checks',{method:'POST',body:{
+      from:$('cFrom').value, to:$('cTo').value, date:$('cDate').value,
+      by:$('cBy').value.trim(), app:$('cApp').value.trim(),
+      popCount:$('cPop').value, popNote:$('cPopNote').value,
+      sample:$('cSample').value, opinion:$('cOpinion').value,
+      fixes:CHK
+    }});
+    HIST.push(check); renderHist(); toast('점검 결과를 저장했습니다');
   }catch(e){ fail(e); }
   finally{ btn.disabled=false; }
 }
@@ -1166,9 +1190,7 @@ function queueDraft(){
   if(readonly()) return;
   clearTimeout(draftTimer);
   draftTimer=setTimeout(async()=>{
-    const fixes={...CHK};
-    document.querySelectorAll('[data-fix]').forEach(i=>{ fixes['fix_'+i.dataset.fix]=i.value.trim(); });
-    CHK=fixes;
+    collectFixes();
     try{ await api('/api/checks',{method:'PATCH',body:{draft:CHK}}); }catch(e){ console.error(e); }
   },900);
 }
@@ -1287,7 +1309,7 @@ async function loadLog(){
   }
 }
 const ACTCLS={'entry.create':'c','entry.update':'u','entry.delete':'d','check.save':'u','check.delete':'d',
-  'user.create':'a','user.update':'a','user.reset':'a'};
+  'user.create':'a','user.update':'a','user.reset':'a','login.fail':'d'};
 function renderLog(){
   const q=$('logQ').value.trim().toLowerCase(), a=$('logAct').value;
   const list=LOG.filter(l=>{
@@ -1570,7 +1592,7 @@ document.querySelectorAll('nav button[data-v]').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button[data-v]').forEach(x=>x.setAttribute('aria-current',x===b));
   const v=b.dataset.v;
   for(const key in VIEWS) $(VIEWS[key]).hidden=key!==v;
-  if(v==='check') renderCheck();
+  if(v==='check') scheduleSummary();
   if(v==='log') loadLog();
   if(v==='users') loadUsers();
   if(v==='storage'){ loadStorage(); loadExports(); }
@@ -1610,10 +1632,14 @@ $('histRows').addEventListener('click',async e=>{
 ['q','fType','fVerdict','fFrom','fTo'].forEach(id=>$(id).addEventListener('input',renderLedger));
 $('fClear').onclick=()=>{['q','fType','fVerdict','fFrom','fTo'].forEach(id=>$(id).value='');renderLedger()};
 Object.values(F).forEach(id=>$(id).addEventListener('input',()=>{
+  /* 담당자가 ID 를 직접 고치면 그 뒤로는 자동으로 바꾸지 않습니다. */
+  if(id==='f_id') idAuto=false;
   if(id==='f_date'||id==='f_type') autoId();
   paintVerdict();
 }));
-['cFrom','cTo','cPop'].forEach(id=>$(id).addEventListener('input',renderCheck));
+/* 기간이 바뀌면 서버에 다시 집계를 요청하고, 대조 건수는 화면에서만 비교합니다. */
+['cFrom','cTo'].forEach(id=>$(id).addEventListener('input',scheduleSummary));
+$('cPop').addEventListener('input',renderCheck);
 $('saveChk').onclick=saveCheck;
 $('expChk').onclick=()=>exportCheckCSV();
 document.addEventListener('keydown',e=>{
@@ -1652,7 +1678,7 @@ $('loginForm').addEventListener('submit',async e=>{
 
 $('logout').onclick=async()=>{
   try{ await api('/api/auth',{method:'POST',body:{action:'logout'}}); }catch(e){}
-  ME=null; DATA=[]; HIST=[]; CHK={}; LOG=[]; STORE=null; LAST={date:'',sys:''};
+  ME=null; DATA=[]; HIST=[]; CHK={}; LOG=[]; STORE=null; SUMMARY=null; LAST={date:'',sys:''};
   $('notice').innerHTML='';
   renderLedger(); renderCheck();
   showGate('로그아웃했습니다.');
@@ -1690,7 +1716,7 @@ async function boot(){
   }
   [$('stats'),$('rows')].forEach(skOff);
 
-  renderLedger(); renderStd(); renderCheck();
+  renderLedger(); renderStd(); scheduleSummary();
 
   /* 용량·반출 공지는 로그인을 지연시키지 않도록 뒤이어 불러옵니다. */
   loadStorage();
