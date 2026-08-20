@@ -14,6 +14,7 @@ import {
   clearSession,
   currentUser,
   audit,
+  auditAttempt,
   sameOrigin,
 } from '../lib/auth.js';
 
@@ -57,8 +58,15 @@ export default async function handler(req, res) {
     const stored = row?.password_hash ?? 'scrypt$00$00';
     const ok = await verifyPassword(String(password), stored);
 
-    if (!row || !ok) return res.status(401).json({ error: BAD_LOGIN });
+    /* 실패한 시도도 기록합니다. 계정 존재 여부는 남기지 않습니다 —
+       변경 이력은 열람 전용 계정도 볼 수 있어, 어느 아이디가 실재하는지
+       구분되면 그 자체가 정보가 됩니다. */
+    if (!row || !ok) {
+      await auditAttempt(username, 'login.fail', '자격 증명 불일치');
+      return res.status(401).json({ error: BAD_LOGIN });
+    }
     if (!row.active) {
+      await auditAttempt(row.username, 'login.fail', '비활성 계정');
       return res.status(403).json({ error: '비활성화된 계정입니다. 관리자에게 문의하십시오.' });
     }
 
