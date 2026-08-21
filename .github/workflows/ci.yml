@@ -23,6 +23,10 @@ jobs:
       # 판정 규칙과 점검 집계는 통제 결과를 결정하므로 값이 바뀌면 막습니다.
       - name: 판정 · 점검 집계 검증
         run: node scripts/test-judge.mjs
+      # 시트 레이아웃은 엑셀 양식 파일의 머리글과 직접 대조합니다.
+      # 양식이 개정되면 여기서 먼저 막혀 코드를 함께 고치게 됩니다.
+      - name: 시트 레이아웃 검증
+        run: node scripts/test-sheet.mjs
       - name: 서버 코드 문법 검사
         run: |
           for f in api/*.js lib/*.js; do node --check "$f"; done
