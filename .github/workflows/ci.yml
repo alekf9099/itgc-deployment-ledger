@@ -33,6 +33,9 @@ jobs:
       # 반출본 형식과 해시는 증적 무결성의 근거이므로 값이 바뀌면 막습니다.
       - name: 반출본 · 수식 주입 방어 검증
         run: node scripts/test-csv.mjs
+      # 판정 열을 반입하게 되면 시트에서 판정을 고칠 수 있으므로 매핑을 고정합니다.
+      - name: 시트 반입 매핑·검증
+        run: node scripts/test-import.mjs
       - name: 서버 코드 문법 검사
         run: |
           for f in api/*.js lib/*.js; do node --check "$f"; done

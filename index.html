@@ -278,6 +278,17 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
   color:inherit;border-radius:6px;padding:4px 11px;font-size:11.5px;font-weight:600;cursor:pointer;opacity:.85}
 .note .go:hover{opacity:1}
 
+/* ─────────── 시트 반입 ─────────── */
+.imp{width:100%;border-collapse:collapse;font-size:12px;margin-top:12px}
+.imp th{background:#F0F2F6;font-size:11px;padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.imp td{padding:6px 8px;border-bottom:1px solid var(--line-2);vertical-align:top}
+.imp td.l{font-family:var(--mono);font-size:11px;color:var(--ink-3);white-space:nowrap}
+.imp tr.add{background:#F2F9F5} .imp tr.upd{background:#F3F7FD}
+.imp tr.skip{background:#FBF6EC} .imp tr.err{background:var(--bad-bg)}
+.imp .w{white-space:normal;color:var(--ink-2)}
+.impsum{display:flex;gap:14px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;margin-top:10px}
+.impsum b{font-weight:600}
+
 /* ─────────── 저장소 ─────────── */
 .gauge{height:11px;border-radius:6px;background:var(--line-2);overflow:hidden;margin:11px 0 7px}
 .gauge span{display:block;height:100%;border-radius:6px;background:#2FA98D;transition:width .3s}
@@ -471,6 +482,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
         <option value="entry.delete">배포 건 삭제</option>
         <option value="check.save">월간 점검 저장</option>
         <option value="check.delete">월간 점검 삭제</option>
+        <option value="sheet.import">시트 반입</option>
         <option value="login">로그인</option>
         <option value="login.fail">로그인 실패</option>
         <option value="login.block">로그인 차단</option>
@@ -585,8 +597,19 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
       <button class="btn" id="shPush" hidden>지금 반사</button>
     </div>
 
+    <div class="panel" id="impPanel" hidden>
+      <h3><i>05</i>시트에서 가져오기</h3>
+      <p>시트에 입력한 내용을 대장으로 반입합니다. <b>자동이 아니라 눌렀을 때만 동작하며, 적용 전에 무엇이 바뀌는지 보여줍니다.</b> 시트 편집은 누가 했는지 알 수 없으므로 <b>적용을 누른 사람</b>이 수행자로 기록됩니다. 판정 열은 가져오지 않고, 시트에서 사라진 행은 건드리지 않습니다.</p>
+      <div class="togglerow">
+        <button class="btn ghost" id="impPreview">미리보기</button>
+        <button class="btn" id="impApply" hidden>적용</button>
+        <em id="impHint"></em>
+      </div>
+      <div id="impResult"></div>
+    </div>
+
     <div class="panel">
-      <h3><i>05</i>증적 반출 이력</h3>
+      <h3><i>06</i>증적 반출 이력</h3>
       <p>언제 누가 어떤 범위로 증적을 내보내 보관했는지 기록합니다. 기록 보존 절차를 증명하는 값이므로 대장·점검 결과 CSV를 내보낼 때 자동으로 남습니다.</p>
       <table class="chk"><thead><tr>
         <th style="width:150px">일시</th><th style="width:120px">수행자</th><th>범위</th>
@@ -711,7 +734,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.11.0';
+const APP_VERSION='2.12.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -1013,7 +1036,7 @@ const ACT={'entry.create':'등록','entry.update':'수정','entry.delete':'삭�
   'login':'로그인','login.fail':'로그인 실패','login.block':'로그인 차단','password.change':'비밀번호 변경',
   'user.create':'계정 발급','user.update':'계정 변경','user.reset':'비밀번호 재설정',
   'export.ledger':'대장 반출','export.check':'점검 결과 반출','export.backup':'전체 백업 반출',
-  'export.sheet':'Sheets 반사','sheet.auto':'자동 반사 설정'};
+  'export.sheet':'Sheets 반사','sheet.auto':'자동 반사 설정','sheet.import':'시트 반입'};
 function when(v){
   if(!v) return '';
   const d=new Date(v);
@@ -1397,7 +1420,7 @@ async function loadLog(){
   }
 }
 const ACTCLS={'entry.create':'c','entry.update':'u','entry.delete':'d','check.save':'u','check.delete':'d',
-  'user.create':'a','user.update':'a','user.reset':'a','login.fail':'d','login.block':'d'};
+  'user.create':'a','user.update':'a','user.reset':'a','login.fail':'d','login.block':'d','sheet.import':'u'};
 function renderLog(){
   const q=$('logQ').value.trim().toLowerCase(), a=$('logAct').value;
   const list=LOG.filter(l=>{
@@ -1562,6 +1585,8 @@ async function loadSheetStatus(render=true){
       <span>시트 탭 ${esc((s.tabs||[]).join(' · '))}</span>
       <span>서비스 계정 ${esc(s.account)}</span></div>`;
     $('shPush').hidden=readonly();
+    /* 연동이 확인된 뒤에만 가져오기를 노출합니다. */
+    $('impPanel').hidden=readonly();
   }catch(e){
     SHEET_READY=false;
     if(render) box.innerHTML=`<span style="color:var(--bad);font-size:12px">${esc(e.message)}</span>`;
@@ -1604,6 +1629,93 @@ $('shPush').onclick=async()=>{
     loadExports();
   }catch(e){ fail(e); }
   finally{ btn.disabled=false; btn.textContent='지금 반사'; }
+};
+
+/* ── 시트에서 가져오기 ── */
+let IMPORT_PLAN=null;
+
+function impRows(plan){
+  const rows=[];
+  plan.add.forEach(it=>rows.push(`<tr class="add"><td class="l">${it.line}행</td>
+    <td>추가</td><td class="l">${esc(it.entry.id)}</td>
+    <td class="w">${esc([it.entry.date,it.entry.type,it.entry.sys].filter(Boolean).join(' · '))}</td></tr>`));
+  plan.update.forEach(it=>rows.push(`<tr class="upd"><td class="l">${it.line}행</td>
+    <td>변경</td><td class="l">${esc(it.id)}</td>
+    <td class="w">${Object.entries(it.changed).map(([f,[a,b]])=>
+      `${esc(f)} <s style="color:var(--ink-3)">${esc(a)||'(공란)'}</s> → <b>${esc(b)||'(공란)'}</b>`).join('<br>')}</td></tr>`));
+  plan.skip.forEach(it=>rows.push(`<tr class="skip"><td class="l">${it.line}행</td>
+    <td>제외</td><td class="l">${esc(it.id)||'—'}</td><td class="w">${esc(it.reason)}</td></tr>`));
+  return rows;
+}
+
+async function impLoad(){
+  const box=$('impResult'), btn=$('impPreview');
+  btn.disabled=true; $('impApply').hidden=true; $('impHint').textContent='';
+  box.innerHTML=`<span style="color:var(--ink-3);font-size:12px">시트를 읽는 중…</span>`;
+  try{
+    const plan=await api('/api/sheet-import');
+    IMPORT_PLAN=plan;
+    const rows=impRows(plan);
+    const changes=plan.add.length+plan.update.length;
+
+    box.innerHTML=`<div class="impsum">
+        <span>읽은 행 <b>${plan.read}</b></span>
+        <span>추가 <b>${plan.add.length}</b></span>
+        <span>변경 <b>${plan.update.length}</b></span>
+        <span>제외 <b>${plan.skip.length}</b></span>
+      </div>${rows.length?`<table class="imp"><thead><tr>
+        <th style="width:64px">위치</th><th style="width:56px">구분</th>
+        <th style="width:150px">증적 문서 ID</th><th>내용</th></tr></thead>
+        <tbody>${rows.join('')}</tbody></table>`
+      :`<div style="color:var(--ink-3);font-size:12px;margin-top:10px">시트와 대장이 같습니다. 반입할 것이 없습니다.</div>`}`;
+
+    /* 반영할 것이 있고 관리자일 때만 적용 버튼을 노출합니다. */
+    $('impApply').hidden=!(changes>0&&ME?.role==='admin');
+    if(changes>0&&ME?.role!=='admin') $('impHint').textContent='적용은 관리자만 할 수 있습니다';
+  }catch(e){
+    box.innerHTML=`<span style="color:var(--bad);font-size:12px">${esc(e.message)}</span>`;
+    IMPORT_PLAN=null;
+  }finally{ btn.disabled=false; }
+}
+
+$('impPreview').onclick=impLoad;
+
+$('impApply').onclick=async()=>{
+  if(!IMPORT_PLAN) return;
+  const n=IMPORT_PLAN.add.length+IMPORT_PLAN.update.length;
+  if(!confirm(`시트 내용을 대장에 반영합니다.
+
+추가 ${IMPORT_PLAN.add.length}건 · 변경 ${IMPORT_PLAN.update.length}건
+
+반영 사실이 회원님 이름으로 변경 이력에 기록됩니다. 진행하시겠습니까?`)) return;
+
+  const btn=$('impApply'); btn.disabled=true; btn.textContent='반영 중…';
+  try{
+    const r=await api('/api/sheet-import',{method:'POST'});
+    const extra=[];
+    if(r.conflict.length) extra.push(`충돌 ${r.conflict.length}건`);
+    if(r.failed.length) extra.push(`실패 ${r.failed.length}건`);
+    toast(`반입 완료 — 추가 ${r.added} · 변경 ${r.updated}${extra.length?' · '+extra.join(' · '):''}`);
+
+    /* 충돌·실패는 사유를 남겨 사람이 확인하게 합니다. */
+    if(r.conflict.length||r.failed.length){
+      const rows=[
+        ...r.conflict.map(c=>`<tr class="err"><td class="l">${c.line}행</td><td>충돌</td>
+          <td class="l">${esc(c.id)}</td><td class="w">웹에서 먼저 수정되어 건너뜀. 최신 값을 확인한 뒤 다시 시도하십시오</td></tr>`),
+        ...r.failed.map(f=>`<tr class="err"><td class="l">${f.line}행</td><td>실패</td>
+          <td class="l">${esc(f.id)}</td><td class="w">${esc(f.reason)}</td></tr>`)];
+      $('impResult').innerHTML=`<table class="imp"><thead><tr>
+        <th style="width:64px">위치</th><th style="width:56px">구분</th>
+        <th style="width:150px">증적 문서 ID</th><th>사유</th></tr></thead>
+        <tbody>${rows.join('')}</tbody></table>`;
+    } else {
+      $('impResult').innerHTML=`<div style="color:var(--ok);font-size:12px;margin-top:10px">모두 반영했습니다.</div>`;
+    }
+    IMPORT_PLAN=null; btn.hidden=true;
+    await reloadEntries();
+    scheduleSummary();
+  }catch(e){ fail(e); }
+  finally{ btn.disabled=false; btn.textContent='적용'; }
 };
 
 $('stReload').onclick=()=>{ loadStorage(); loadExports(); loadSheetStatus(); };
