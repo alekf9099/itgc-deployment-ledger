@@ -18,8 +18,12 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT        NOT NULL,
   active        BOOLEAN     NOT NULL DEFAULT TRUE,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  last_login_at TIMESTAMPTZ
+  last_login_at TIMESTAMPTZ,
+  -- 세션 세대. 비밀번호가 바뀌면 올려서 이전 세션을 모두 무효로 만듭니다.
+  session_epoch INTEGER     NOT NULL DEFAULT 0
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS session_epoch INTEGER NOT NULL DEFAULT 0;
 
 COMMENT ON COLUMN users.role IS
   'admin: 계정 관리 및 삭제 가능 / member: 대장 작성·점검 수행 / viewer: 열람만';
@@ -121,3 +125,7 @@ CREATE TABLE IF NOT EXISTS settings (
   updated_by TEXT,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- 로그인 시도 제한은 최근 실패 건수를 세어 판단하므로 조회 경로를 만들어 둡니다.
+CREATE INDEX IF NOT EXISTS audit_log_login_fail_idx
+  ON audit_log (actor, at DESC) WHERE action = 'login.fail';

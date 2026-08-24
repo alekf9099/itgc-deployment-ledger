@@ -470,6 +470,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
         <option value="check.delete">월간 점검 삭제</option>
         <option value="login">로그인</option>
         <option value="login.fail">로그인 실패</option>
+        <option value="login.block">로그인 차단</option>
         <option value="password.change">비밀번호 변경</option>
       </select>
     </div>
@@ -707,13 +708,13 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.7.0';
+const APP_VERSION='2.8.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
    어느 PC에서 접속해도 같은 대장을 보게 되고, 캐시를 지워도 기록은 남습니다. */
 class ApiError extends Error{
-  constructor(msg,status){ super(msg); this.status=status; }
+  constructor(msg,status,extra){ super(msg); this.status=status; Object.assign(this,extra??{}); }
 }
 async function api(path,opt={}){
   const res=await fetch(path,{
@@ -724,7 +725,8 @@ async function api(path,opt={}){
   });
   let data=null;
   try{ data=await res.json(); }catch(e){}
-  if(!res.ok) throw new ApiError(data?.error||`요청에 실패했습니다 (${res.status})`,res.status);
+  if(!res.ok) throw new ApiError(data?.error||`요청에 실패했습니다 (${res.status})`,res.status,
+    {conflict:!!data?.conflict});
   return data;
 }
 
@@ -972,7 +974,7 @@ async function loadEntryHist(rec){
 }
 const ACT={'entry.create':'등록','entry.update':'수정','entry.delete':'삭제',
   'check.save':'월간 점검 저장','check.delete':'월간 점검 삭제',
-  'login':'로그인','login.fail':'로그인 실패','password.change':'비밀번호 변경',
+  'login':'로그인','login.fail':'로그인 실패','login.block':'로그인 차단','password.change':'비밀번호 변경',
   'user.create':'계정 발급','user.update':'계정 변경','user.reset':'비밀번호 재설정',
   'export.ledger':'대장 반출','export.check':'점검 결과 반출','export.backup':'전체 백업 반출',
   'export.sheet':'Sheets 반사','sheet.auto':'자동 반사 설정'};
@@ -998,6 +1000,10 @@ async function save(keepOpen){
   if(!r.date) miss.push('배포일'); if(!r.type) miss.push('릴리즈 구분');
   if(!r.sys) miss.push('대상 시스템'); if(!r.judge) miss.push('유형 판정자');
   if(miss.length) return toast(miss.join(', ')+'을 입력하십시오');
+
+  /* 불러온 시점의 최종 수정 시각을 함께 보내, 그 사이 다른 담당자가
+     저장했으면 서버가 거부하게 합니다. */
+  if(editing) r.expectedUpdatedAt=editing._meta?.updatedAt??null;
 
   const btn=$('dSave'), btn2=$('dSaveNext');
   btn.disabled=btn2.disabled=true;
@@ -1032,8 +1038,26 @@ async function del(){
 /* 세션이 끊긴 경우와 그 밖의 오류를 구분해 처리합니다. */
 function fail(e){
   if(e instanceof ApiError && e.status===401){ ME=null; showGate('세션이 만료되었습니다. 다시 로그인하십시오.'); return; }
+  /* 동시 수정 충돌은 최신 내용을 다시 불러와야 하므로 따로 안내합니다. */
+  if(e instanceof ApiError && e.status===409 && e.conflict){
+    alert(e.message);
+    reloadEntries();
+    return;
+  }
   toast(e.message||'요청에 실패했습니다');
   console.error(e);
+}
+
+/* 서버의 최신 대장으로 다시 맞춥니다. */
+async function reloadEntries(){
+  try{
+    const {entries}=await api('/api/entries');
+    DATA=entries; renderLedger();
+    if(editing){
+      const fresh=DATA.find(x=>x.k===editing.k);
+      if(fresh) openDrawer(fresh); else closeDrawer();
+    }
+  }catch(e){ console.error(e); }
 }
 
 /* ══════════════ 월간 점검 ══════════════ */
@@ -1329,7 +1353,7 @@ async function loadLog(){
   }
 }
 const ACTCLS={'entry.create':'c','entry.update':'u','entry.delete':'d','check.save':'u','check.delete':'d',
-  'user.create':'a','user.update':'a','user.reset':'a','login.fail':'d'};
+  'user.create':'a','user.update':'a','user.reset':'a','login.fail':'d','login.block':'d'};
 function renderLog(){
   const q=$('logQ').value.trim().toLowerCase(), a=$('logAct').value;
   const list=LOG.filter(l=>{

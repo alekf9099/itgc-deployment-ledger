@@ -56,11 +56,32 @@ export default async function handler(req, res) {
 
     const values = toRow(body);
     const before = await one(
-      `SELECT ${COLS.join(', ')}, deleted_at FROM entries WHERE k = $1`,
+      `SELECT ${COLS.join(', ')}, deleted_at, updated_at FROM entries WHERE k = $1`,
       [k]
     );
     if (before?.deleted_at) {
       return res.status(409).json({ error: '삭제 표시된 건입니다. 관리자에게 문의하십시오.' });
+    }
+
+    /**
+     * 동시 수정 방지
+     *
+     * 화면이 불러온 시점의 최종 수정 시각을 함께 보내고, 그 사이에 다른
+     * 담당자가 저장했으면 거부합니다. 그러지 않으면 나중에 누른 쪽이 앞선
+     * 변경을 조용히 덮어써, 이력에는 남지만 값은 사라집니다.
+     *
+     * 신규 등록(before 없음)에는 적용하지 않습니다.
+     */
+    if (before) {
+      const seen = body.expectedUpdatedAt ?? null;
+      const actual = before.updated_at ? new Date(before.updated_at).toISOString() : null;
+      const sent = seen ? new Date(seen).toISOString() : null;
+      if (sent !== actual) {
+        return res.status(409).json({
+          error: '다른 담당자가 먼저 이 건을 수정했습니다. 화면을 새로고침해 최신 내용을 확인한 뒤 다시 저장하십시오.',
+          conflict: true,
+        });
+      }
     }
 
     const setList = COLS.map((c, i) => `${c} = $${i + 2}`).join(', ');

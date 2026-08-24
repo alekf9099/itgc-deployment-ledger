@@ -27,6 +27,9 @@ jobs:
       # 양식이 개정되면 여기서 먼저 막혀 코드를 함께 고치게 됩니다.
       - name: 시트 레이아웃 검증
         run: node scripts/test-sheet.mjs
+      # 세션 토큰 형식이 바뀌면 전 사용자가 로그아웃되므로 규칙을 고정합니다.
+      - name: 세션 토큰 검증
+        run: node scripts/test-session.mjs
       - name: 서버 코드 문법 검사
         run: |
           for f in api/*.js lib/*.js; do node --check "$f"; done
