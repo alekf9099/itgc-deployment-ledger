@@ -71,6 +71,7 @@ QA유닛이 운영하는 배포 관리 대장입니다. 배포 이력 전수를 
 | `lib/entry.js` | 배포 건 필드 정의 |
 | `lib/sheet.js` | 엑셀 양식 레이아웃 |
 | `lib/google.js` | 서비스 계정 인증, Sheets API 호출 |
+| `lib/settings.js` | 운영 설정 (자동 반사 여부) |
 | `db/schema.sql` | 테이블 정의 |
 | `scripts/migrate.mjs` | 스키마 적용 |
 | `scripts/create-user.mjs` | 계정 생성 · 비밀번호 재설정 |
@@ -212,7 +213,19 @@ POSTGRES_URL="복사한_연결문자열" node scripts/create-user.mjs hhkim 김�
 등록 후 재배포하면 「06 저장소 → Google Sheets 반사」에 대상 시트 제목과
 탭 목록이 표시됩니다. `지금 반사` 로 실행합니다.
 
-반사는 증적 반출로 `audit_log` 에 기록됩니다.
+### 실행 방식
+
+| 방식 | 동작 |
+|---|---|
+| `지금 반사` 버튼 | 누를 때 한 번 반사. 작성 권한 이상 |
+| `저장할 때 자동으로 반사` | 배포 건·점검 결과 저장 시마다 반사. **기본 꺼짐**, 켜고 끄는 것은 관리자만 |
+
+자동 반사는 연속 저장 시 마지막 저장 후 한 번만 보냅니다. 반사에 실패해도
+대장 저장은 유지되며, 실패 사실만 알립니다. 열람 전용 계정과 연동 미완료
+상태에서는 자동 반사를 시도하지 않습니다.
+
+설정값은 `settings` 테이블에 저장되어 담당자 전체에 같이 적용되며,
+켜고 끈 기록은 `audit_log` 에 남습니다. 반사 자체도 증적 반출로 기록됩니다.
 
 ### 안전장치
 
@@ -277,6 +290,29 @@ feature 브랜치 ──PR──▶ main ──자동──▶ Vercel Production
 > Preview 환경변수로 분리한 뒤 진행합니다.
 
 자세한 절차는 [CONTRIBUTING.md](CONTRIBUTING.md)를 보십시오.
+### Preview DB 브랜치 관리
+
+Preview 배포는 **PR 마다 별도 Neon DB 브랜치**를 만들어 씁니다. PR 검증 중
+넣은 시험 데이터가 운영 대장에 섞이지 않게 하기 위한 격리입니다.
+
+Neon Free 플랜은 프로젝트당 브랜치 개수에 한도가 있습니다. 머지·종료된 PR 의
+브랜치가 정리되지 않고 쌓이면 한도에 걸려 **Preview 배포가 실패**합니다.
+
+```
+Deployments — Branch limit reached. Upgrade your plan or delete unused branches.
+```
+
+이 메시지가 나오면 코드 문제가 아닙니다. Neon 콘솔 → **Branches** 에서
+`preview/...` 브랜치를 지우고 배포를 다시 걸면 됩니다.
+
+> **`production` / `main`(Primary) 브랜치는 지우지 마십시오.** 대장 실데이터가
+> 그 안에 있습니다. Production 배포는 브랜치를 만들지 않으므로, 이 오류가
+> 나더라도 운영 사이트는 영향을 받지 않습니다.
+
+브랜치 격리를 포기하면(Preview 도 운영 DB 사용) 이 문제는 없어지지만, PR
+검증 데이터가 운영 대장에 들어가게 됩니다. 격리를 유지하고 브랜치를 정리하는
+편이 낫습니다.
+
 
 ---
 

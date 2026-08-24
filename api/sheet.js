@@ -1,8 +1,9 @@
 /**
  * Google Sheets 반사 (웹 → 시트, 한 방향)
  *
- *   GET  /api/sheet   설정·연결 상태 확인
- *   POST /api/sheet   대장과 최근 점검 결과를 대상 시트에 덮어쓰기
+ *   GET   /api/sheet                  설정·연결 상태 확인
+ *   POST  /api/sheet                  대장과 최근 점검 결과를 대상 시트에 덮어쓰기
+ *   PATCH /api/sheet  { auto: bool }  저장 시 자동 반사 켜기·끄기 (admin)
  *
  * 시트는 **읽기 전용 사본**입니다. 정본은 이 대장입니다. 시트에서 값을 고쳐도
  * 다음 반사에서 덮어써집니다. 시트 편집 권한을 담당자에게 주지 마십시오 —
@@ -20,6 +21,7 @@ import {
 import {
   sheetConfig, readRange, writeRanges, clearRanges, spreadsheetInfo,
 } from '../lib/google.js';
+import { getSettings, setSettings } from '../lib/settings.js';
 
 const LAST_COL = colName(LEDGER_HEADER.length);
 
@@ -44,9 +46,11 @@ export default async function handler(req, res) {
     if (!user) return;
 
     const { missing, email, sheetId } = sheetConfig();
+    const { sheetAuto } = await getSettings();
+
     if (missing.length) {
       return res.status(200).json({
-        configured: false, missing,
+        configured: false, missing, auto: sheetAuto,
         hint: '서비스 계정을 발급하고 환경변수를 등록한 뒤 대상 시트를 그 계정에 편집자로 공유하십시오.',
       });
     }
@@ -56,19 +60,34 @@ export default async function handler(req, res) {
       const tabs = (info.sheets ?? []).map((s) => s.properties.title);
       await assertTemplate();
       return res.status(200).json({
-        configured: true, ok: true,
+        configured: true, ok: true, auto: sheetAuto,
         title: info.properties?.title, tabs,
         account: email, sheetId,
       });
     } catch (e) {
       return res.status(200).json({
-        configured: true, ok: false, error: e.message, account: email, sheetId,
+        configured: true, ok: false, auto: sheetAuto,
+        error: e.message, account: email, sheetId,
       });
     }
   }
 
+  if (req.method === 'PATCH') {
+    if (!sameOrigin(req)) {
+      return res.status(403).json({ error: '허용되지 않은 요청 출처입니다.' });
+    }
+    /* 자동 반사는 자료가 외부로 나가는 동작을 상시화하므로 admin 만 바꿉니다. */
+    const user = await requireUser(req, res, 'admin');
+    if (!user) return;
+
+    const auto = Boolean(req.body?.auto);
+    await setSettings({ sheetAuto: auto }, user.name);
+    await audit(user, 'sheet.auto', null, { '자동 반사': [!auto ? '켬' : '끔', auto ? '켬' : '끔'] }, null);
+    return res.status(200).json({ auto });
+  }
+
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'GET, POST');
+    res.setHeader('Allow', 'GET, POST, PATCH');
     return res.status(405).json({ error: '지원하지 않는 메서드입니다.' });
   }
   if (!sameOrigin(req)) {

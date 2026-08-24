@@ -113,3 +113,11 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 CREATE INDEX IF NOT EXISTS audit_log_at_idx     ON audit_log (at DESC);
 CREATE INDEX IF NOT EXISTS audit_log_target_idx ON audit_log (target);
+
+-- 운영 설정 (자동 반사 여부 등). 한 행만 둡니다.
+CREATE TABLE IF NOT EXISTS settings (
+  id         INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  data       JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  updated_by TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
