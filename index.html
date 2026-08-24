@@ -644,8 +644,8 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
         <label class="f"><span>릴리즈 구분<em>*</em></span><select id="f_type"><option value="">선택</option><option>정규</option><option>수시</option><option>핫픽스</option></select></label>
       </div>
       <div class="row one">
-        <label class="f"><span>증적 문서 ID<em>*</em></span><input type="text" id="f_id" placeholder="QA-유형코드-YYYYMMDD-01">
-          <div class="hint" id="idHint">배포일과 유형을 먼저 고르면 자동 생성됩니다. 보고서 본문과 게시글 제목에 동일하게 표기하십시오.</div></label>
+        <label class="f"><span>증적 문서 ID<em>*</em></span><input type="text" id="f_id" placeholder="QA-YYYYMMDD-01">
+          <div class="hint" id="idHint">배포일을 고르면 자동 생성됩니다. 보고서 본문과 게시글 제목에 동일하게 표기하십시오.</div></label>
       </div>
       <div class="row">
         <label class="f"><span>대상 시스템<em>*</em></span>
@@ -711,7 +711,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.10.0';
+const APP_VERSION='2.11.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -740,6 +740,26 @@ const readonly=()=>!ME||ME.role==='viewer';
 
 /* ══════════════ 판정 엔진 ══════════════ */
 const CODE={'정규':'R','수시':'A','핫픽스':'E'};
+
+/**
+ * 증적 문서 ID 형식
+ *
+ * 현재 체계는 QA-{배포일 YYYYMMDD}-{일련 2자리} 입니다. 유형은 ID 가 아니라
+ * 「릴리즈 구분」 열로만 관리합니다.
+ *
+ * 유형코드가 들어간 구 형식(QA-A-20260814-01)도 인정합니다. 이미 부여된 ID 는
+ * 바꾸지 않는 것이 원칙이라, 새 규칙 때문에 기존 건이 형식 위반이 되면 안 됩니다.
+ * 서버(lib/judge.js)와 같은 규칙이므로 한쪽만 고치면 판정이 어긋납니다.
+ */
+const ID_CURRENT=/^QA-(\d{8})-(\d{2,})$/, ID_LEGACY=/^QA-([RAE])-(\d{8})-(\d{2,})$/;
+function parseDocId(id){
+  const t=String(id??'').trim();
+  let m=ID_CURRENT.exec(t);
+  if(m) return {date:m[1],seq:+m[2],code:null};
+  m=ID_LEGACY.exec(t);
+  if(m) return {date:m[2],seq:+m[3],code:m[1]};
+  return null;
+}
 const OFFSET={'정규':0,'수시':3,'핫픽스':2};
 const pad=n=>String(n).padStart(2,'0');
 const ymd=d=>d?`${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`:'';
@@ -767,8 +787,15 @@ function judge(r){
   else if(r.schema==='없음') v.integ = r.int ? 'bad' : 'na';
   else if(r.int==='완료'&&r.intby) v.integ='ok';
   else v.integ='bad';
-  if(!r.id||!r.date||!r.type) v.idc=null;
-  else v.idc = (r.id.slice(3,4)===CODE[r.type] && r.id.slice(5,13)===ymd(parse(r.date))) ? 'ok' : 'bad';
+  if(!r.id||!r.date) v.idc=null;
+  else{
+    const pid=parseDocId(r.id);
+    if(!pid) v.idc='bad';                                          /* 형식 위반 */
+    else if(pid.date!==ymd(parse(r.date))) v.idc='bad';             /* 날짜부 불일치 */
+    /* 구 형식에 남아 있는 유형코드는 그대로 검사합니다. */
+    else if(pid.code&&(!r.type||pid.code!==CODE[r.type])) v.idc='bad';
+    else v.idc='ok';
+  }
   v.flag = ['term','sod','appr','map','integ','idc'].some(k=>v[k]==='bad');
   v.overall = !r.date ? null : (v.flag?'확인필요':'정상');
   return v;
@@ -889,13 +916,19 @@ function autoId(){
      「ID 정합성」이 불일치로 표시해 사유를 확인하게 하는 것이 의도입니다.
      여기서 덮어쓰면 그 흔적이 사라지고 보고서와의 매핑도 끊깁니다. */
   if(!idAuto) return;
-  const d=$('f_date').value, t=$('f_type').value;
-  if(!d||!t) return;
+  const d=$('f_date').value;
+  /* 유형은 ID 에 들어가지 않으므로 배포일만 고르면 부여됩니다. */
+  if(!d) return;
+  const ymdv=ymd(parse(d));
+  const pre=`QA-${ymdv}-`;
   const cur=$('f_id').value.trim();
-  const pre=`QA-${CODE[t]}-${ymd(parse(d))}-`;
   if(cur && cur.startsWith(pre)) return;
-  const used=DATA.filter(r=>r.k!==(editing?.k)&&r.id?.startsWith(pre))
-    .map(r=>parseInt(r.id.slice(-2),10)).filter(n=>!isNaN(n));
+  /* 일련번호는 같은 배포일 안에서 유형과 무관하게 이어집니다.
+     구 형식 건도 같은 날짜면 번호를 차지하므로 함께 셉니다. */
+  const used=DATA.filter(r=>r.k!==(editing?.k))
+    .map(r=>parseDocId(r.id))
+    .filter(p=>p&&p.date===ymdv)
+    .map(p=>p.seq);
   $('f_id').value=pre+pad((used.length?Math.max(...used):0)+1);
 }
 /* 같은 날 여러 건을 연달아 등록하는 경우가 많아, 직전에 저장한 값을 다음 건에
@@ -918,8 +951,8 @@ function openDrawer(rec){
   /* 신규 등록에서만 ID 를 자동으로 채웁니다. */
   idAuto=!rec;
   $('idHint').textContent=rec
-    ? '이미 부여된 ID 는 배포일·유형을 바꿔도 자동으로 변경되지 않습니다. 어긋나면 「ID 정합성」이 불일치로 표시되므로 사유를 비고에 남기십시오.'
-    : '배포일과 유형을 먼저 고르면 자동 생성됩니다. 보고서 본문과 게시글 제목에 동일하게 표기하십시오.';
+    ? '이미 부여된 ID 는 배포일을 바꿔도 자동으로 변경되지 않습니다. 어긋나면 「ID 정합성」이 불일치로 표시되므로 사유를 비고에 남기십시오.'
+    : '배포일을 고르면 자동 생성됩니다. 보고서 본문과 게시글 제목에 동일하게 표기하십시오.';
 
   const carried=[];
   if(!rec&&!ro){
@@ -1280,7 +1313,7 @@ function exportCheck(id,label){
 
 /* ══════════════ 기준 ══════════════ */
 const DEF_IN=[
- ['증적 문서 ID','QA-{유형코드}-{배포일 YYYYMMDD}-{일련 2자리}   예) QA-A-20260813-01\n유형코드 R(정규) / A(수시) / E(핫픽스). 일련번호는 같은 배포일·같은 유형 내에서 01부터 부여합니다.\n날짜부는 배포일과 일치시킵니다. 불일치 시 ID 정합성이 「불일치」로 표기됩니다.\n유형 판정 확정 후 부여하며, 이후 유형이 변경되어도 ID는 바꾸지 않습니다. 실제 유형은 릴리즈 구분에 따릅니다.\n보고서 본문과 게시글 제목에 동일 ID를 표기합니다. 제목 표기는 ID로 증적을 검색하기 위한 필수 요건입니다.'],
+ ['증적 문서 ID','QA-{배포일 YYYYMMDD}-{일련 2자리}   예) QA-20260824-01\n일련번호는 같은 배포일 안에서 유형과 무관하게 01부터 부여합니다.\n날짜부는 배포일과 일치시킵니다. 불일치 시 ID 정합성이 「불일치」로 표기됩니다.\n유형은 ID 에 넣지 않고 「릴리즈 구분」 항목으로만 관리합니다. 유형이 재판정되어도 ID 는 바꾸지 않으며, 재판정 사실은 변경 이력에 남습니다.\n유형코드가 들어간 구 형식(QA-A-20260814-01)도 유효한 값으로 인정합니다. 이미 부여된 ID 는 바꾸지 않습니다.\n보고서 본문과 게시글 제목에 동일 ID 를 표기합니다. 제목 표기는 ID 로 증적을 검색하기 위한 필수 요건입니다.'],
  ['배포일','실제 운영 반영일. 배포 이력(GitHub RELEASE 머지 PR)과 일치해야 합니다. 월간 점검의 집계 기준일입니다.'],
  ['릴리즈 구분','정규 / 수시 / 핫픽스를 배포 요청 시점에 판정합니다.\n다음 중 하나라도 해당하면 일감 건수와 무관하게 정규로 취급합니다 — DB 스키마 변경 또는 데이터 마이그레이션, 인증·권한·과금 로직 변경, 외부 연동 규격 변경, 신규 화면 또는 신규 기능 추가, 다수 일감 묶음 배포 또는 서비스 개편.'],
  ['유형 판정자','릴리즈 유형을 판정한 담당자. 차등 증적 적용의 정당성 근거이므로 공란으로 두지 않습니다. 판정 근거는 QA 완료 보고서에 기재합니다.'],
@@ -1302,7 +1335,7 @@ const DEF_FX=[
  ['승인 기록','배포 승인자와 승인일이 모두 있으면 완비, 하나라도 비면 미완비. PC-01 승인 요건입니다.'],
  ['증적 매핑','증적 문서 ID가 있으면 매핑완료, 없으면 매핑미완료. 증적 상태가 「해당없음」이면 해당없음.'],
  ['정합성 확인','스키마 변경 「해당」 + 검증 「완료」 + 검증자 기재 → 정상\n스키마 변경 「해당」 + 검증 「부적합」·「미실시」 또는 검증자 공란 → 비정상\n스키마 변경 「없음」 + 검증 공란 → 미해당\n스키마 변경 「없음」인데 검증값이 있으면 → 비정상 (기재 오류이며 월간 점검에서 입력 오류로 분리 집계)'],
- ['ID 정합성','증적 문서 ID의 유형코드가 릴리즈 구분과 일치하고 날짜부가 배포일과 일치하면 정상, 그 외는 불일치.\n부여 오류 또는 유형 재판정 이력일 수 있으므로 사유를 확인해 비고에 남깁니다.'],
+ ['ID 정합성','ID 가 QA-{배포일 YYYYMMDD}-{일련 2자리} 형식이고 날짜부가 배포일과 일치하면 정상, 그 외는 불일치.\n구 형식 QA-{유형코드}-{날짜}-{일련} 은 유형코드가 릴리즈 구분과 일치하는지도 함께 봅니다.\n형식이 어긋나거나 날짜가 다르면 부여 오류이므로 사유를 확인해 비고에 남깁니다.'],
  ['판정 스트립 / 종합 판정','여섯 항목 중 하나라도 이상값이면 그 행은 확인필요로 분류되고 붉게 표시됩니다.\n판정은 입력값에서 계산되며 직접 수정할 수 없습니다. 값을 임의로 정할 수 있으면 통제의 신뢰성이 사라집니다.'],
 ];
 const SCOPE=[
