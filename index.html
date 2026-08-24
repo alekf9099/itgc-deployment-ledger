@@ -711,7 +711,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.9.0';
+const APP_VERSION='2.10.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -1239,112 +1239,43 @@ function chkSnapshot(){
     items:s?s.items.filter(it=>it.key!=='__split__').map(it=>({...it,fix:fixOf(it)})):[]
   };
 }
-function csvEscape(rows){
-  return '\uFEFF'+rows.map(r=>r.map(c=>`"${(c??'').toString().replace(/"/g,'""')}"`).join(',')).join('\r\n');
-}
-function exportCheckCSV(snap){
-  const s=snap||chkSnapshot();
-  if(!s.from||!s.to) return toast('점검 대상 기간을 입력하십시오');
-  const match = s.popCount===''||s.popCount===undefined ? '미입력'
-    : (Number(s.popCount)===s.ledCount ? '일치' : `불일치 (차이 ${Math.abs(Number(s.popCount)-s.ledCount)}건)`);
-  const R=[];
-  R.push(['월간 점검 기록']);
-  R.push(['점검 대상 통제','PC-01 애플리케이션 변경 승인 및 개발자/사용자 테스트 · PD-02 데이터 정합성 테스트']);
-  R.push(['점검 근거','릴리즈 유형별 QA/QC 증적 수립 표준 가이드라인 5항']);
-  R.push(['점검 주체','QA유닛 (통제부서)']);
-  R.push(['점검 방법','대장 전수 검토 및 배포 이력(GitHub RELEASE 머지 PR 목록) 대조']);
-  R.push(['점검 대상 기간 (배포일 기준)',`${s.from} ~ ${s.to}`]);
-  R.push(['점검 수행일',s.date]);
-  R.push(['점검자',s.by]);
-  R.push(['확인자',s.app]);
-  R.push([]);
-  R.push(['1. 모집단 완전성 확인']);
-  R.push(['구분','건수']);
-  R.push(['배포 이력 건수 (GitHub RELEASE 머지 PR)',s.popCount]);
-  R.push(['대장 기재 건수',s.ledCount]);
-  R.push(['일치 여부',match]);
-  R.push(['차이 원인 및 조치',s.popNote]);
-  R.push([]);
-  R.push(['2. 점검 항목별 결과']);
-  R.push(['구분','점검 항목','관련 통제','건수','판단 기준','조치 내용']);
-  s.items.forEach(it=>R.push([it.isDef?'지적 항목':'확인 항목',it.name,it.ctrl,it.n,it.crit,it.fix]));
-  R.push([]);
-  R.push(['3. 표본 재검토',s.sample]);
-  R.push([]);
-  R.push(['4. 점검 결과']);
-  R.push(['모집단 건수',s.ledCount]);
-  R.push(['확인필요 건수',s.flagged]);
-  R.push(['지적 항목 수',s.defects]);
-  R.push(['점검 결과',s.defects?'보완 필요':'적정 (지적사항 없음)']);
-  R.push(['점검자 의견',s.opinion]);
-  R.push([]);
-  R.push(['구분','성명','일자']);
-  R.push(['점검자 (QA유닛)',s.by,s.date]);
-  R.push(['확인자 (QA유닛 책임자)',s.app,'']);
-  R.push([]);
-  R.push(['※ 본 점검은 통제부서(QA유닛)의 자체 점검이며, 통제검토부서(TA유닛)의 검토와는 별개의 절차이다.']);
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([csvEscape(R)],{type:'text/csv'}));
-  a.download=`QA-MC-${s.from.slice(0,7)}_월간점검.csv`; a.click();
-  toast('점검 결과 CSV를 내보냈습니다');
-  logExport('check',`${s.from}~${s.to}`,s.ledCount);
-}
-async function saveCheck(replace){
-  if(readonly()) return toast('열람 전용 계정입니다');
-  if(CONFIRMED&&!replace) return toast('이미 확정된 회차입니다');
-  const from=$('cFrom').value, to=$('cTo').value;
-  if(!from||!to) return toast('점검 대상 기간을 입력하십시오');
-  if(!$('cDate').value||!$('cBy').value.trim()) return toast('점검 수행일과 점검자를 입력하십시오');
-  if(!SUMMARY) return toast('집계를 불러오는 중입니다. 잠시 후 다시 시도하십시오');
-
-  collectFixes();
-  /* 서버도 같은 검사를 하지만, 확정을 누른 뒤 반려되는 것보다 미리 알리는 편이 낫습니다. */
-  const missing=SUMMARY.items.filter(it=>it.isDef&&it.n>0&&!fixOf(it)).map(it=>it.name);
-  if(missing.length) return toast(`조치 내용을 기재하십시오 — ${missing.join(', ')}`);
-
-  const btn=$('saveChk'); btn.disabled=true;
+/**
+ * 증적 반출
+ *
+ * 파일과 해시를 서버가 만듭니다. 화면이 만든 파일의 해시를 화면이 계산해
+ * 보내면 값을 고친 파일에 맞는 해시를 함께 보낼 수 있어, 무결성 증명이
+ * 되지 않습니다.
+ */
+async function downloadExport(params){
   try{
-    /* 확정되는 집계는 서버가 다시 계산합니다. 화면은 입력값만 보냅니다. */
-    await api('/api/checks',{method:'POST',body:{...readRound(),from,to,replace:!!replace}});
-    REPLACING=false;
-    await loadRound();
-    scheduleSheetPush();
-    toast('점검 결과를 확정했습니다');
+    const res=await fetch('/api/export?'+new URLSearchParams(params),{credentials:'same-origin'});
+    if(!res.ok){
+      let msg=`반출에 실패했습니다 (${res.status})`;
+      try{ msg=(await res.json()).error||msg; }catch(e){}
+      if(res.status===401){ ME=null; showGate('세션이 만료되었습니다. 다시 로그인하십시오.'); return; }
+      return toast(msg);
+    }
+    const hash=res.headers.get('X-Export-Sha256')||'';
+    const blob=await res.blob();
+
+    /* 파일 이름은 응답 헤더 대신 화면에서 정합니다. 브라우저마다 헤더의
+       한글 파일명 처리가 달라 결과가 갈립니다. */
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=params.name;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+
+    toast(`반출했습니다 · SHA-256 ${hash.slice(0,12)}…`);
+    /* 저장소 화면이 열려 있으면 반출 이력을 바로 갱신합니다. */
+    if(!$('v-storage').hidden) loadExports();
   }catch(e){ fail(e); }
-  finally{ btn.disabled=false; }
 }
 
-/* 확정된 회차를 다시 작성합니다. 기존 기록은 제외 표시만 남습니다. */
-$('cRedo').onclick=async()=>{
-  if(!CONFIRMED) return;
-  if(!confirm(`${CONFIRMED.from} ~ ${CONFIRMED.to} 회차를 다시 작성합니다.
-
-기존 확정 기록(${CONFIRMED.by}, ${CONFIRMED.date})은 이력에서 제외 표시되고 내용은 보존됩니다. 진행하시겠습니까?`)) return;
-  const keep={...CONFIRMED};
-  CONFIRMED=null;
-  fillRound(keep);           /* 확정 당시 값을 그대로 이어서 고칠 수 있게 둡니다. */
-  renderCheck();
-  toast('재작성 상태입니다. 내용을 고친 뒤 확정하십시오');
-  REPLACING=true;
-};
-
-/* 재작성 중인지. 확정 시 기존 기록을 제외하도록 서버에 알립니다. */
-let REPLACING=false;
-
-/* 조치 내용은 확정 전에도 유실되지 않도록 입력이 멈추면 초안으로 저장합니다. */
-let draftTimer=null;
-function queueDraft(){
-  /* 확정된 회차는 읽기 전용이므로 초안을 남기지 않습니다. */
-  if(readonly()||CONFIRMED) return;
-  const from=$('cFrom').value, to=$('cTo').value;
-  if(!from||!to) return;
-  clearTimeout(draftTimer);
-  draftTimer=setTimeout(async()=>{
-    collectFixes();
-    try{
-      await api('/api/checks',{method:'PATCH',body:{from,to,draft:readRound()}});
-    }catch(e){ console.error(e); }
-  },900);
+/** 확정된 점검 회차를 반출합니다. */
+function exportCheck(id,label){
+  if(!id) return toast('확정된 회차만 반출할 수 있습니다');
+  downloadExport({kind:'check',id,name:`QA-MC-${(label||'').slice(0,7)}_월간점검.csv`});
 }
 
 /* ══════════════ 기준 ══════════════ */
@@ -1411,41 +1342,13 @@ function renderStd(){
 }
 
 /* ══════════════ CSV ══════════════ */
-const CSVH=['증적 문서 ID','배포일','릴리즈 구분','유형 판정자','대상 시스템','일감/릴리즈 식별자',
- '변경 작성자','검증 수행자','QA 판정','배포 승인자','배포 승인일','스키마·데이터 변경','정합성 검증',
- '정합성 검증자','증적 등록일','증적 등록 경로','증적 상태','등록 기한','기한 준수','직무 분리',
- '승인 기록','증적 매핑','정합성 확인','ID 정합성','종합 판정','예외 승인자','비고'];
-/* 내보내기는 증적 반출에 해당하므로 범위와 건수를 이력에 남깁니다. */
-function exportRows(list,filename,kind,scope){
-  const rows=list.map(r=>{
-    const v=judge(r);
-    const L=k=>v[k]?(LABEL[k][v[k]]||''):'';
-    return [r.id,r.date,r.type,r.judge,r.sys,r.task,r.dev,r.qa,r.qav,r.appr,r.apprd,
-      r.schema,r.int,r.intby,r.reg,r.path,r.state,fmt(v.deadline),
-      L('term'),L('sod'),L('appr'),L('map'),L('integ'),L('idc'),v.overall||'',r.exc,r.memo];
+function exportLedger(){
+  downloadExport({
+    kind:'ledger',
+    q:$('q').value.trim(), type:$('fType').value, verdict:$('fVerdict').value,
+    from:$('fFrom').value, to:$('fTo').value,
+    name:`배포관리대장_${fmt(new Date())}.csv`,
   });
-  const csv='\uFEFF'+[CSVH,...rows].map(r=>r.map(c=>`"${(c??'').toString().replace(/"/g,'""')}"`).join(',')).join('\r\n');
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-  a.download=filename; a.click();
-  toast('CSV를 내보냈습니다');
-  logExport(kind,scope,list.length);
-}
-
-/* 어떤 조건으로 뽑은 자료인지 남기지 않으면 반출본이 전수인지 일부인지 알 수 없습니다. */
-function filterScope(){
-  const p=[];
-  if($('q').value.trim()) p.push(`검색 "${$('q').value.trim()}"`);
-  if($('fType').value) p.push(`유형 ${$('fType').value}`);
-  if($('fVerdict').value) p.push(`판정 ${$('fVerdict').value}`);
-  if($('fFrom').value||$('fTo').value) p.push(`배포일 ${$('fFrom').value||'전체'}~${$('fTo').value||'전체'}`);
-  return p.length?p.join(' · '):'전체 (필터 없음)';
-}
-
-function exportCSV(){
-  const list=filtered();
-  if(!list.length) return toast('내보낼 배포 건이 없습니다');
-  exportRows(list,`배포관리대장_${fmt(new Date())}.csv`,'ledger',filterScope());
 }
 
 /* ══════════════ 변경 이력 화면 ══════════════ */
@@ -1588,12 +1491,6 @@ async function loadExports(){
   }
 }
 
-/* 반출 기록. 실패해도 내보내기 자체는 막지 않습니다. */
-async function logExport(kind,scope,count){
-  try{ await api('/api/storage',{method:'POST',body:{action:'log-export',kind,scope,count}}); }
-  catch(e){ console.error(e); }
-}
-
 /* ── Google Sheets 반사 ── */
 /* 연동이 준비됐는지. 자동 반사는 이 값이 참일 때만 시도합니다. */
 let SHEET_READY=false, SHEET_AUTO=false;
@@ -1677,10 +1574,10 @@ $('shPush').onclick=async()=>{
 };
 
 $('stReload').onclick=()=>{ loadStorage(); loadExports(); loadSheetStatus(); };
-$('stExport').onclick=()=>{
-  if(!DATA.length) return toast('내보낼 배포 건이 없습니다');
-  exportRows(DATA,`배포관리대장_전체_${fmt(new Date())}.csv`,'backup','전체');
-  setTimeout(()=>{ loadStorage(); loadExports(); },800);
+$('stExport').onclick=async()=>{
+  if(!DATA.length) return toast('반출할 배포 건이 없습니다');
+  await downloadExport({kind:'backup',name:`배포관리대장_전체_${fmt(new Date())}.csv`});
+  loadStorage();
 };
 
 /* ══════════════ 비밀번호 변경 ══════════════ */
@@ -1841,7 +1738,7 @@ function resetView(){
 ['logQ','logAct'].forEach(id=>$(id).addEventListener('input',renderLog));
 $('logReload').onclick=loadLog;
 $('add').onclick=()=>openDrawer(null);
-$('exp').onclick=exportCSV;
+$('exp').onclick=exportLedger;
 $('dClose').onclick=$('dCancel').onclick=closeDrawer;
 $('scrim').onclick=closeDrawer;
 /* 클릭 이벤트가 keepOpen 인자로 넘어가지 않도록 감싸 호출합니다. */
@@ -1861,7 +1758,7 @@ $('histRows').addEventListener('click',async e=>{
     return;
   }
   const cid=e.target.dataset.hcsv;
-  if(cid){ const h=HIST.find(x=>x.id===cid); if(h) exportCheckCSV(h); return; }
+  if(cid){ const h=HIST.find(x=>x.id===cid); if(h) exportCheck(h.id,h.from); return; }
   const id=e.target.dataset.hdel; if(!id) return;
   if(ME?.role!=='admin') return toast('삭제 권한이 없습니다');
   const h=HIST.find(x=>x.id===id);
@@ -1884,7 +1781,11 @@ Object.values(F).forEach(id=>$(id).addEventListener('input',()=>{
 $('cPop').addEventListener('input',renderCheck);
 /* 클릭 이벤트가 replace 인자로 넘어가지 않도록 감싸 호출합니다. */
 $('saveChk').onclick=()=>saveCheck(REPLACING);
-$('expChk').onclick=()=>exportCheckCSV();
+/* 확정된 회차만 반출합니다. 확정 전 값은 점검 결과로서 의미가 없습니다. */
+$('expChk').onclick=()=>{
+  if(!CONFIRMED) return toast('회차를 확정한 뒤 반출할 수 있습니다');
+  exportCheck(CONFIRMED.id,CONFIRMED.from);
+};
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){ closeDrawer(); pwClose(); return; }
   /* 입력 화면이 열려 있을 때 키보드만으로 저장할 수 있게 합니다. */

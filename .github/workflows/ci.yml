@@ -30,6 +30,9 @@ jobs:
       # 세션 토큰 형식이 바뀌면 전 사용자가 로그아웃되므로 규칙을 고정합니다.
       - name: 세션 토큰 검증
         run: node scripts/test-session.mjs
+      # 반출본 형식과 해시는 증적 무결성의 근거이므로 값이 바뀌면 막습니다.
+      - name: 반출본 · 수식 주입 방어 검증
+        run: node scripts/test-csv.mjs
       - name: 서버 코드 문법 검사
         run: |
           for f in api/*.js lib/*.js; do node --check "$f"; done
