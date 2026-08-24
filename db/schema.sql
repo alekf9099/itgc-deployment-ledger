@@ -95,7 +95,28 @@ CREATE TABLE IF NOT EXISTS checks (
 ALTER TABLE checks ADD COLUMN IF NOT EXISTS deleted_by TEXT;
 ALTER TABLE checks ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 
--- 점검 화면의 조치 내용 임시 저장 (확정 전 초안)
+-- 점검은 「회차」 단위이며 회차는 대상 기간으로 식별합니다. 같은 기간이 두 건
+-- 있으면 어느 것이 정본인지 알 수 없으므로 한 건만 허용합니다.
+-- 제외 표시된 건은 대상에서 빼, 재작성할 수 있게 둡니다.
+CREATE UNIQUE INDEX IF NOT EXISTS checks_period_uniq
+  ON checks (period_from, period_to) WHERE deleted_at IS NULL;
+
+-- 확정 전 작성 내용 (회차별)
+--
+-- 조치 내용만 담던 check_draft 를 회차별 표로 바꿉니다. 기간을 바꿨을 때
+-- 이전 회차에 쓰던 값이 남아 섞이는 것을 막고, 새로고침해도 작성 중 내용이
+-- 유지되게 하기 위한 것입니다.
+CREATE TABLE IF NOT EXISTS check_drafts (
+  period_from DATE        NOT NULL,
+  period_to   DATE        NOT NULL,
+  data        JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  updated_by  TEXT,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (period_from, period_to)
+);
+
+-- 이전 단일 행 초안 표. 회차별 표로 대체되어 더 쓰지 않습니다.
+-- 남겨 두더라도 해가 없고, 표를 지우는 것보다 안전합니다.
 CREATE TABLE IF NOT EXISTS check_draft (
   id         INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
   data       JSONB       NOT NULL DEFAULT '{}'::jsonb,
