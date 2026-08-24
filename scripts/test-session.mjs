@@ -50,7 +50,10 @@ eq(readToken(makeToken(7, 0)), { userId: 7, epoch: 0 }, '발급한 토큰은 읽
 eq(readToken(makeToken(7, 3)), { userId: 7, epoch: 3 }, '세대가 보존됨');
 
 /* 위조 */
-eq(readToken(makeToken(7, 0).replace(/.$/, 'A') ), null, '서명이 바뀌면 거부');
+/* 마지막 글자를 원래와 다른 값으로 바꿔야 실제로 위조가 됩니다.
+   'A' 로 고정하면 원래 글자가 'A' 인 경우 토큰이 그대로여서 통과합니다. */
+const flip = (tok) => tok.slice(0, -1) + (tok.endsWith('A') ? 'B' : 'A');
+eq(readToken(flip(makeToken(7, 0))), null, '서명이 바뀌면 거부');
 const t = makeToken(7, 0);
 const [uid, ep, exp, mac] = t.split('.');
 eq(readToken(`8.${ep}.${exp}.${mac}`), null, '사용자를 바꾸면 서명이 맞지 않아 거부');

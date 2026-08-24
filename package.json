@@ -1,6 +1,6 @@
 {
   "name": "itgc-deployment-ledger",
-  "version": "2.8.0",
+  "version": "2.9.0",
   "private": true,
   "type": "module",
   "description": "ITGC PC-01/PD-02 배포 관리 대장",

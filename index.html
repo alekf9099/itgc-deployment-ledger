@@ -366,14 +366,17 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
   <section id="v-check" hidden>
     <div class="head">
       <div>
-        <h1>월간 점검</h1>
-        <p class="sub">QA유닛이 월 1회 수행합니다. 집계 기간은 <b>배포일 기준</b>이며, 기간 말 배포 건의 등록 기한이 지난 익월 초에 수행합니다. 지적사항이 없어도 이력을 남깁니다.</p>
+        <h1>월간 점검 <span class="st" id="cState" hidden></span></h1>
+        <p class="sub">QA유닛이 월 1회 수행합니다. 집계 기간은 <b>배포일 기준</b>이며, 기간 말 배포 건의 등록 기한이 지난 익월 초에 수행합니다. 지적사항이 없어도 이력을 남깁니다. <b>회차는 대상 기간으로 식별하며 회차당 한 건만 확정됩니다.</b></p>
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn ghost" id="expChk">점검 결과 CSV</button>
-        <button class="btn" id="saveChk">점검 결과 저장</button>
+        <button class="btn ghost" id="cRedo" hidden>재작성</button>
+        <button class="btn" id="saveChk">점검 결과 확정</button>
       </div>
     </div>
+
+    <div id="cNotice"></div>
 
     <div class="panel">
       <h3><i>01</i>점검 개요</h3>
@@ -708,7 +711,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.8.0';
+const APP_VERSION='2.9.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -1065,40 +1068,94 @@ async function reloadEntries(){
    값을 그대로 그립니다.
    정의를 양쪽에 두면 한쪽만 바뀌어 어긋나고, 집계를 화면이 계산해 보내면
    저장되는 수치를 요청 조작으로 바꿀 수 있습니다. */
-let SUMMARY=null, sumTimer=null;
+let SUMMARY=null, CONFIRMED=null, sumTimer=null;
+
+/* 점검 회차의 입력 항목. 조치 내용은 따로 모읍니다. */
+const CFORM={date:'cDate',by:'cBy',app:'cApp',popCount:'cPop',
+  popNote:'cPopNote',sample:'cSample',opinion:'cOpinion'};
 
 /* 기간을 고칠 때마다 요청하지 않도록 잠깐 모아 보냅니다. */
 function scheduleSummary(){
   clearTimeout(sumTimer);
-  sumTimer=setTimeout(loadSummary,350);
+  sumTimer=setTimeout(loadRound,350);
 }
 
-async function loadSummary(){
+/**
+ * 회차 불러오기
+ *
+ * 기간이 바뀌면 그 회차의 집계·작성중·확정 내용을 모두 다시 받고 입력값을
+ * 통째로 교체합니다. 그러지 않으면 이전 회차에 쓰던 표본·의견이 남아
+ * 다른 회차의 집계와 섞인 채로 확정됩니다.
+ */
+async function loadRound(){
   const from=$('cFrom').value, to=$('cTo').value;
-  if(!from||!to){ SUMMARY=null; renderCheck(); return; }
+  if(!from||!to){ SUMMARY=null; CONFIRMED=null; renderCheck(); return; }
   skOn($('chkRows'),skRows([150,58,42,220,150],6));
   try{
     const r=await api(`/api/checks?from=${from}&to=${to}`);
     SUMMARY=r.summary||null;
+    CONFIRMED=r.confirmed||null;
     if(r.hist) HIST=r.hist;
+
+    /* 확정된 회차는 확정 당시의 값을, 작성 중이면 저장된 초안을 채웁니다. */
+    fillRound(CONFIRMED||r.draft||null);
     skOff($('chkRows')); renderCheck();
   }catch(e){
     skOff($('chkRows'));
-    SUMMARY=null; renderCheck(); fail(e);
+    SUMMARY=null; CONFIRMED=null; renderCheck(); fail(e);
   }
 }
 
-/* 조치 내용은 입력 중인 값을 우선하고, 없으면 서버에 저장된 초안을 씁니다. */
-const fixOf=it=>CHK['fix_'+it.key]??it.fix??'';
+/** 입력 항목을 통째로 교체합니다. 값이 없으면 비웁니다. */
+function fillRound(src){
+  CHK={};
+  for(const k in CFORM) $(CFORM[k]).value=src?(src[k]??''):'';
+  if(src?.fixes) for(const key in src.fixes) CHK[key]=src.fixes[key];
+  if(src?.items) src.items.forEach(it=>{ if(it.fix) CHK[it.key]=it.fix; });
+  /* 새로 시작하는 회차는 점검자를 로그인 계정으로 채워 둡니다. */
+  if(!src&&!readonly()&&ME) $('cBy').value=ME.name;
+}
+
+/** 화면의 현재 입력값 */
+function readRound(){
+  const out={fixes:{...CHK}};
+  for(const k in CFORM) out[k]=$(CFORM[k]).value;
+  return out;
+}
+
+/* 조치 내용은 입력 중인 값을 우선하고, 없으면 서버가 준 값을 씁니다. */
+const fixOf=it=>CHK[it.key]??it.fix??'';
 
 function renderCheck(){
-  const s=SUMMARY;
-  $('cLed').value=s?`${s.ledgerCount} 건`:'—';
+  const live=SUMMARY, done=CONFIRMED;
+  /* 확정된 회차는 확정 당시의 집계를 보여줍니다. 그 뒤 대장이 바뀌었더라도
+     점검 기록은 그 시점의 사실이어야 합니다. */
+  const s=done||live;
+  const locked=!!done, ro=readonly()||locked;
 
-  const pop=$('cPop').value, m=$('cMatch');
+  /* 상태 배지 */
+  const badge=$('cState');
+  if(!live&&!done){ badge.hidden=true; }
+  else{
+    badge.hidden=false;
+    badge.className='st '+(done?'on':'off');
+    badge.textContent=done?'확정':'작성 중';
+  }
+
+  /* 확정 여부에 따른 조작 노출 */
+  $('saveChk').hidden=ro;
+  $('cRedo').hidden=!(locked&&ME?.role==='admin');
+  for(const k in CFORM) $(CFORM[k]).disabled=ro;
+  ['cFrom','cTo'].forEach(id=>{ $(id).disabled=readonly(); });
+
+  $('cNotice').innerHTML=noticeFor(done,live);
+
+  $('cLed').value=s?`${s.ledgerCount??s.ledCount} 건`:'—';
+
+  const pop=$('cPop').value, m=$('cMatch'), led=s?(s.ledgerCount??s.ledCount):0;
   if(!s||pop===''){ m.className='mres i'; m.textContent='미입력'; }
-  else if(+pop===s.ledgerCount){ m.className='mres y'; m.textContent='일치'; }
-  else { m.className='mres n'; m.textContent=`불일치 (차이 ${Math.abs(+pop-s.ledgerCount)}건)`; }
+  else if(+pop===led){ m.className='mres y'; m.textContent='일치'; }
+  else { m.className='mres n'; m.textContent=`불일치 (차이 ${Math.abs(+pop-led)}건)`; }
 
   if(!s){
     $('chkRows').innerHTML=`<tr><td colspan="5" style="color:var(--ink-3);padding:16px">대상 기간을 입력하면 집계됩니다.</td></tr>`;
@@ -1107,8 +1164,9 @@ function renderCheck(){
     renderHist(); return;
   }
 
-  const ro=readonly();
-  $('chkRows').innerHTML=s.items.map(it=>{
+  /* 확정 기록에는 구분선 항목이 없으므로 정의 순서를 기준으로 그립니다. */
+  const items=done?withSplit(done.items):s.items;
+  $('chkRows').innerHTML=items.map(it=>{
     if(it.key==='__split__') return `<tr class="split"><td colspan="5">[ 확인 항목 ] ${esc(it.crit)}</td></tr>`;
     const hit=it.isDef&&it.n>0;
     return `<tr class="${hit?'hit':''}">
@@ -1117,11 +1175,42 @@ function renderCheck(){
       <td><input type="text" data-fix="${esc(it.key)}" value="${esc(fixOf(it))}" placeholder="${hit?'조치 내용 필수':''}" style="width:100%"${ro?' disabled':''}></td></tr>`;
   }).join('');
 
-  const ok=s.defects===0;
+  const defects=s.defects??0, flagged=s.flagged??0;
+  const ok=defects===0;
   $('cResult').className='result '+(ok?'pass':'fail');
   $('cResult').innerHTML=`${ok?'적정 · 지적사항 없음':'보완 필요'}
-    <small>지적 항목 ${s.defects} · 모집단 ${s.ledgerCount}건 · 확인필요 ${s.flagged}건</small>`;
+    <small>지적 항목 ${defects} · 모집단 ${led}건 · 확인필요 ${flagged}건</small>`;
   renderHist();
+}
+
+/* 확정 기록의 항목 목록에 확인 항목 구분선을 끼워 넣습니다. */
+function withSplit(items){
+  const out=[]; let split=false;
+  (items||[]).forEach(it=>{
+    if(!it.isDef&&!split){
+      out.push({key:'__split__',crit:'다음 항목은 지적사항이 아니며, 발생 건의 후속 조치 이행 여부를 확인합니다.'});
+      split=true;
+    }
+    out.push(it);
+  });
+  return out;
+}
+
+/* 회차 상태 안내. 확정 이후 대장이 바뀌었으면 그 사실을 알립니다. */
+function noticeFor(done,live){
+  if(!done) return '';
+  const rows=[`${esc(done.date)} <b>${esc(done.by)}</b> 확정${done.app?` · 확인자 ${esc(done.app)}`:''}`];
+  if(live){
+    const diff=[];
+    if(live.ledgerCount!==done.ledCount) diff.push(`모집단 ${done.ledCount} → ${live.ledgerCount}건`);
+    if(live.defects!==done.defects) diff.push(`지적 항목 ${done.defects} → ${live.defects}개`);
+    if(diff.length){
+      return `<div class="note warn"><b>확인</b><span>확정 이후 대장이 바뀌었습니다 — ${diff.join(' · ')}.
+        아래 표는 <b>확정 당시</b>의 집계입니다. 필요하면 관리자가 「재작성」으로 다시 확정하십시오.</span></div>`;
+    }
+  }
+  return `<div class="note warn" style="background:var(--ok-bg);border-color:#BFE3D9;color:var(--ok)">
+    <b style="background:#C9E9DF;color:#0B5F4E">확정</b><span>${rows[0]} · 내용은 읽기 전용입니다.</span></div>`;
 }
 function renderHist(){
   const tb=$('histRows');
@@ -1131,11 +1220,11 @@ function renderHist(){
     <td>${esc(h.by)}</td><td>${esc(h.app)}</td><td class="c">${h.pop}</td>
     <td class="c" style="${h.defects?'color:var(--bad);font-weight:700':''}">${h.defects}</td>
     <td>${h.defects?'보완 필요':'적정'}</td>
-    <td class="act"><button data-hcsv="${h.id}">CSV</button><button data-hdel="${h.id}">삭제</button></td></tr>`).join('');
+    <td class="act"><button data-hopen="${h.id}">열기</button><button data-hcsv="${h.id}">CSV</button><button data-hdel="${h.id}">삭제</button></td></tr>`).join('');
 }
 /* 화면에 입력된 조치 내용을 CHK 로 모읍니다. */
 function collectFixes(){
-  document.querySelectorAll('[data-fix]').forEach(i=>{ CHK['fix_'+i.dataset.fix]=i.value.trim(); });
+  document.querySelectorAll('[data-fix]').forEach(i=>{ CHK[i.dataset.fix]=i.value.trim(); });
 }
 
 /* CSV 에 쓰는 현재 화면 상태. 집계 수치는 서버가 계산한 값을 그대로 씁니다. */
@@ -1200,42 +1289,61 @@ function exportCheckCSV(snap){
   toast('점검 결과 CSV를 내보냈습니다');
   logExport('check',`${s.from}~${s.to}`,s.ledCount);
 }
-async function saveCheck(){
+async function saveCheck(replace){
   if(readonly()) return toast('열람 전용 계정입니다');
-  if(!$('cFrom').value||!$('cTo').value) return toast('점검 대상 기간을 입력하십시오');
+  if(CONFIRMED&&!replace) return toast('이미 확정된 회차입니다');
+  const from=$('cFrom').value, to=$('cTo').value;
+  if(!from||!to) return toast('점검 대상 기간을 입력하십시오');
   if(!$('cDate').value||!$('cBy').value.trim()) return toast('점검 수행일과 점검자를 입력하십시오');
   if(!SUMMARY) return toast('집계를 불러오는 중입니다. 잠시 후 다시 시도하십시오');
 
   collectFixes();
-  /* 서버도 같은 검사를 하지만, 저장을 누른 뒤 반려되는 것보다 미리 알리는 편이 낫습니다. */
+  /* 서버도 같은 검사를 하지만, 확정을 누른 뒤 반려되는 것보다 미리 알리는 편이 낫습니다. */
   const missing=SUMMARY.items.filter(it=>it.isDef&&it.n>0&&!fixOf(it)).map(it=>it.name);
   if(missing.length) return toast(`조치 내용을 기재하십시오 — ${missing.join(', ')}`);
 
   const btn=$('saveChk'); btn.disabled=true;
   try{
-    await api('/api/checks',{method:'PATCH',body:{draft:CHK}});
-    /* 저장되는 집계는 서버가 다시 계산합니다. 화면은 입력값만 보냅니다. */
-    const {check}=await api('/api/checks',{method:'POST',body:{
-      from:$('cFrom').value, to:$('cTo').value, date:$('cDate').value,
-      by:$('cBy').value.trim(), app:$('cApp').value.trim(),
-      popCount:$('cPop').value, popNote:$('cPopNote').value,
-      sample:$('cSample').value, opinion:$('cOpinion').value,
-      fixes:CHK
-    }});
-    HIST.push(check); renderHist(); scheduleSheetPush();
-    toast('점검 결과를 저장했습니다');
+    /* 확정되는 집계는 서버가 다시 계산합니다. 화면은 입력값만 보냅니다. */
+    await api('/api/checks',{method:'POST',body:{...readRound(),from,to,replace:!!replace}});
+    REPLACING=false;
+    await loadRound();
+    scheduleSheetPush();
+    toast('점검 결과를 확정했습니다');
   }catch(e){ fail(e); }
   finally{ btn.disabled=false; }
 }
 
+/* 확정된 회차를 다시 작성합니다. 기존 기록은 제외 표시만 남습니다. */
+$('cRedo').onclick=async()=>{
+  if(!CONFIRMED) return;
+  if(!confirm(`${CONFIRMED.from} ~ ${CONFIRMED.to} 회차를 다시 작성합니다.
+
+기존 확정 기록(${CONFIRMED.by}, ${CONFIRMED.date})은 이력에서 제외 표시되고 내용은 보존됩니다. 진행하시겠습니까?`)) return;
+  const keep={...CONFIRMED};
+  CONFIRMED=null;
+  fillRound(keep);           /* 확정 당시 값을 그대로 이어서 고칠 수 있게 둡니다. */
+  renderCheck();
+  toast('재작성 상태입니다. 내용을 고친 뒤 확정하십시오');
+  REPLACING=true;
+};
+
+/* 재작성 중인지. 확정 시 기존 기록을 제외하도록 서버에 알립니다. */
+let REPLACING=false;
+
 /* 조치 내용은 확정 전에도 유실되지 않도록 입력이 멈추면 초안으로 저장합니다. */
 let draftTimer=null;
 function queueDraft(){
-  if(readonly()) return;
+  /* 확정된 회차는 읽기 전용이므로 초안을 남기지 않습니다. */
+  if(readonly()||CONFIRMED) return;
+  const from=$('cFrom').value, to=$('cTo').value;
+  if(!from||!to) return;
   clearTimeout(draftTimer);
   draftTimer=setTimeout(async()=>{
     collectFixes();
-    try{ await api('/api/checks',{method:'PATCH',body:{draft:CHK}}); }catch(e){ console.error(e); }
+    try{
+      await api('/api/checks',{method:'PATCH',body:{from,to,draft:readRound()}});
+    }catch(e){ console.error(e); }
   },900);
 }
 
@@ -1744,6 +1852,14 @@ $('rows').addEventListener('click',e=>{
   const k=e.target.dataset.edit; if(k) openDrawer(DATA.find(r=>r.k===k));
 });
 $('histRows').addEventListener('click',async e=>{
+  /* 행의 기간을 누르면 그 회차를 화면에서 엽니다. CSV 를 열지 않고도
+     지난 점검을 확인할 수 있어야 합니다. */
+  const open=e.target.dataset.hopen;
+  if(open){
+    const h=HIST.find(x=>x.id===open);
+    if(h){ $('cFrom').value=h.from; $('cTo').value=h.to; loadRound(); }
+    return;
+  }
   const cid=e.target.dataset.hcsv;
   if(cid){ const h=HIST.find(x=>x.id===cid); if(h) exportCheckCSV(h); return; }
   const id=e.target.dataset.hdel; if(!id) return;
@@ -1766,7 +1882,8 @@ Object.values(F).forEach(id=>$(id).addEventListener('input',()=>{
 /* 기간이 바뀌면 서버에 다시 집계를 요청하고, 대조 건수는 화면에서만 비교합니다. */
 ['cFrom','cTo'].forEach(id=>$(id).addEventListener('input',scheduleSummary));
 $('cPop').addEventListener('input',renderCheck);
-$('saveChk').onclick=saveCheck;
+/* 클릭 이벤트가 replace 인자로 넘어가지 않도록 감싸 호출합니다. */
+$('saveChk').onclick=()=>saveCheck(REPLACING);
 $('expChk').onclick=()=>exportCheckCSV();
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){ closeDrawer(); pwClose(); return; }
