@@ -59,10 +59,24 @@ eq(judge({ ...base, schema: '없음', int: '완료' }).integ, 'bad', '없음인�
 eq(judge({ ...base, schema: '' }).integ, null, '스키마 항목 미입력은 미판정');
 
 /* ── ID 정합성 ── */
-eq(judge({ date: '2026-08-14', type: '수시', id: 'QA-A-20260814-01' }).idc, 'ok', 'ID 일치');
-eq(judge({ date: '2026-08-14', type: '정규', id: 'QA-A-20260814-01' }).idc, 'bad', '유형코드 불일치');
-eq(judge({ date: '2026-08-13', type: '수시', id: 'QA-A-20260814-01' }).idc, 'bad', '날짜부 불일치');
+/* 현재 체계: QA-{배포일 YYYYMMDD}-{일련}. 유형은 ID 에 넣지 않습니다. */
+eq(judge({ date: '2026-08-24', type: '정규', id: 'QA-20260824-01' }).idc, 'ok', '현행 형식 일치');
+eq(judge({ date: '2026-08-24', type: '수시', id: 'QA-20260824-07' }).idc, 'ok', '유형이 달라도 무관');
+eq(judge({ date: '2026-08-27', type: '정규', id: 'QA-20260824-03' }).idc, 'bad', '날짜부 불일치');
+eq(judge({ date: '2026-08-24', type: '정규', id: 'QA-2026824-01' }).idc, 'bad', '날짜 자릿수 부족은 형식 위반');
+eq(judge({ date: '2026-08-24', type: '정규', id: 'QA-20260824-1' }).idc, 'bad', '일련번호 한 자리는 형식 위반');
+eq(judge({ date: '2026-08-24', type: '정규', id: '20260824-01' }).idc, 'bad', '접두어 없으면 형식 위반');
+eq(judge({ date: '2026-08-24', type: '정규', id: 'QA-20260824-01 ' }).idc, 'ok', '앞뒤 공백은 무시');
+
+/* 구 형식도 유효한 값으로 인정하며, 남아 있는 유형코드는 함께 검사합니다. */
+eq(judge({ date: '2026-08-14', type: '수시', id: 'QA-A-20260814-01' }).idc, 'ok', '구 형식 일치');
+eq(judge({ date: '2026-08-14', type: '정규', id: 'QA-A-20260814-01' }).idc, 'bad', '구 형식 유형코드 불일치');
+eq(judge({ date: '2026-08-13', type: '수시', id: 'QA-A-20260814-01' }).idc, 'bad', '구 형식 날짜부 불일치');
+eq(judge({ date: '2026-08-14', type: '', id: 'QA-A-20260814-01' }).idc, 'bad', '구 형식인데 유형이 비면 확인 필요');
+eq(judge({ date: '2026-08-14', type: '', id: 'QA-20260814-01' }).idc, 'ok', '현행 형식은 유형이 없어도 판정 가능');
+
 eq(judge({ date: '2026-08-14', type: '수시', id: '' }).idc, null, 'ID 없으면 미판정');
+eq(judge({ date: '', type: '수시', id: 'QA-20260814-01' }).idc, null, '배포일 없으면 미판정');
 
 /* ── 종합 판정 ── */
 const clean = {
