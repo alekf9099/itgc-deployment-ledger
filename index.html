@@ -21,6 +21,11 @@
   --sans:"Pretendard Variable",Pretendard,-apple-system,system-ui,sans-serif;
 }
 *{box-sizing:border-box}
+/* hidden 이 인라인 display 나 클래스에 밀리지 않도록 못박습니다. */
+[hidden]{display:none!important}
+.togglerow{display:flex;gap:9px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.togglerow label{font-size:12.5px;cursor:pointer}
+.togglerow em{font-style:normal;font-size:11px;color:var(--ink-3)}
 html,body{margin:0;height:100%}
 body{
   font-family:var(--sans); background:var(--paper); color:var(--ink);
@@ -568,6 +573,11 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
       <h3><i>04</i>Google Sheets 반사</h3>
       <p>대장과 최근 점검 결과를 엑셀 양식 시트에 덮어씁니다. <b>시트는 읽기 전용 사본이고 정본은 이 대장입니다.</b> 시트에서 값을 고쳐도 다음 반사에서 사라집니다. 시트 편집 권한을 담당자에게 주지 마십시오 — 인증과 변경 이력 밖에서 대장이 바뀌면 통제가 성립하지 않습니다.</p>
       <div id="shStatus" style="margin-bottom:13px"></div>
+      <div class="togglerow" id="shAutoBox" hidden>
+        <input type="checkbox" id="shAuto">
+        <label for="shAuto">배포 건과 점검 결과를 <b>저장할 때 자동으로 반사</b></label>
+        <em id="shAutoHint"></em>
+      </div>
       <button class="btn" id="shPush" hidden>지금 반사</button>
     </div>
 
@@ -697,7 +707,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.6.0';
+const APP_VERSION='2.7.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -965,7 +975,7 @@ const ACT={'entry.create':'등록','entry.update':'수정','entry.delete':'삭�
   'login':'로그인','login.fail':'로그인 실패','password.change':'비밀번호 변경',
   'user.create':'계정 발급','user.update':'계정 변경','user.reset':'비밀번호 재설정',
   'export.ledger':'대장 반출','export.check':'점검 결과 반출','export.backup':'전체 백업 반출',
-  'export.sheet':'Sheets 반사'};
+  'export.sheet':'Sheets 반사','sheet.auto':'자동 반사 설정'};
 function when(v){
   if(!v) return '';
   const d=new Date(v);
@@ -997,7 +1007,7 @@ async function save(keepOpen){
     if(i<0) DATA.push(entry); else DATA[i]=entry;
     LAST={date:entry.date||'',sys:entry.sys||''};
     /* 대장이 바뀌었으므로 점검 집계도 다시 받아야 합니다. */
-    renderLedger(); scheduleSummary();
+    renderLedger(); scheduleSummary(); scheduleSheetPush();
     if(keepOpen){
       openDrawer(null); toast('저장했습니다. 다음 건을 입력하십시오');
     } else {
@@ -1014,7 +1024,8 @@ async function del(){
   try{
     await api('/api/entries?k='+encodeURIComponent(editing.k),{method:'DELETE'});
     DATA=DATA.filter(x=>x.k!==editing.k);
-    closeDrawer(); renderLedger(); scheduleSummary(); toast('대장에서 제외했습니다');
+    closeDrawer(); renderLedger(); scheduleSummary(); scheduleSheetPush();
+    toast('대장에서 제외했습니다');
   }catch(e){ fail(e); }
 }
 
@@ -1187,7 +1198,8 @@ async function saveCheck(){
       sample:$('cSample').value, opinion:$('cOpinion').value,
       fixes:CHK
     }});
-    HIST.push(check); renderHist(); toast('점검 결과를 저장했습니다');
+    HIST.push(check); renderHist(); scheduleSheetPush();
+    toast('점검 결과를 저장했습니다');
   }catch(e){ fail(e); }
   finally{ btn.disabled=false; }
 }
@@ -1451,12 +1463,28 @@ async function logExport(kind,scope,count){
 }
 
 /* ── Google Sheets 반사 ── */
-async function loadSheetStatus(){
+/* 연동이 준비됐는지. 자동 반사는 이 값이 참일 때만 시도합니다. */
+let SHEET_READY=false, SHEET_AUTO=false;
+
+/* 화면을 열지 않아도 자동 반사 여부를 알아야 하므로 로그인 직후에도 부릅니다. */
+async function loadSheetStatus(render=true){
   const box=$('shStatus');
-  box.innerHTML=`<span style="color:var(--ink-3);font-size:12px">연동 상태 확인 중…</span>`;
-  $('shPush').hidden=true;
+  if(render){
+    box.innerHTML=`<span style="color:var(--ink-3);font-size:12px">연동 상태 확인 중…</span>`;
+    $('shPush').hidden=true; $('shAutoBox').hidden=true;
+  }
   try{
     const s=await api('/api/sheet');
+    SHEET_AUTO=!!s.auto;
+    SHEET_READY=!!(s.configured&&s.ok);
+    if(!render) return;
+
+    $('shAuto').checked=SHEET_AUTO;
+    /* 자동 반사는 자료가 상시로 외부에 나가므로 관리자만 바꿉니다. */
+    $('shAuto').disabled=ME?.role!=='admin';
+    $('shAutoHint').textContent=ME?.role!=='admin'?'관리자만 변경할 수 있습니다':'';
+    $('shAutoBox').hidden=false;
+
     if(!s.configured){
       box.innerHTML=`<div class="note warn" style="margin:0"><b>미설정</b>
         <span>환경변수가 없습니다 — ${esc(s.missing.join(', '))}<br>${esc(s.hint)}</span></div>`;
@@ -1473,8 +1501,37 @@ async function loadSheetStatus(){
       <span>서비스 계정 ${esc(s.account)}</span></div>`;
     $('shPush').hidden=readonly();
   }catch(e){
-    box.innerHTML=`<span style="color:var(--bad);font-size:12px">${esc(e.message)}</span>`;
+    SHEET_READY=false;
+    if(render) box.innerHTML=`<span style="color:var(--bad);font-size:12px">${esc(e.message)}</span>`;
   }
+}
+
+$('shAuto').onchange=async e=>{
+  const on=e.target.checked;
+  e.target.disabled=true;
+  try{
+    await api('/api/sheet',{method:'PATCH',body:{auto:on}});
+    SHEET_AUTO=on;
+    toast(on?'저장할 때 자동으로 반사합니다':'자동 반사를 껐습니다');
+  }catch(err){ e.target.checked=!on; fail(err); }
+  finally{ e.target.disabled=ME?.role!=='admin'; }
+};
+
+/* 연속 저장 때 매번 보내지 않도록 잠깐 모아 한 번만 반사합니다. */
+let sheetTimer=null;
+function scheduleSheetPush(){
+  if(!SHEET_AUTO||!SHEET_READY||readonly()) return;
+  clearTimeout(sheetTimer);
+  sheetTimer=setTimeout(async()=>{
+    try{
+      const r=await api('/api/sheet',{method:'POST'});
+      toast(`시트에 반사했습니다 — 대장 ${r.rows}건`);
+    }catch(e){
+      /* 반사 실패가 대장 저장을 되돌리지는 않습니다. 알리고 넘어갑니다. */
+      toast('시트 반사에 실패했습니다. 저장소 화면에서 원인을 확인하십시오');
+      console.error(e);
+    }
+  },2500);
 }
 
 $('shPush').onclick=async()=>{
@@ -1724,6 +1781,7 @@ $('loginForm').addEventListener('submit',async e=>{
 $('logout').onclick=async()=>{
   try{ await api('/api/auth',{method:'POST',body:{action:'logout'}}); }catch(e){}
   ME=null; DATA=[]; HIST=[]; CHK={}; LOG=[]; STORE=null; SUMMARY=null; LAST={date:'',sys:''};
+  SHEET_READY=false; SHEET_AUTO=false; clearTimeout(sheetTimer);
   $('notice').innerHTML='';
   renderLedger(); renderCheck();
   showGate('로그아웃했습니다.');
@@ -1763,8 +1821,9 @@ async function boot(){
 
   renderLedger(); renderStd(); scheduleSummary();
 
-  /* 용량·반출 공지는 로그인을 지연시키지 않도록 뒤이어 불러옵니다. */
+  /* 용량·반출 공지와 시트 연동 상태는 로그인을 지연시키지 않도록 뒤이어 확인합니다. */
   loadStorage();
+  loadSheetStatus(false);
 }
 
 (async()=>{
