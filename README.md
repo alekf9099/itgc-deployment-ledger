@@ -290,6 +290,29 @@ feature 브랜치 ──PR──▶ main ──자동──▶ Vercel Production
 > Preview 환경변수로 분리한 뒤 진행합니다.
 
 자세한 절차는 [CONTRIBUTING.md](CONTRIBUTING.md)를 보십시오.
+### Preview DB 브랜치 관리
+
+Preview 배포는 **PR 마다 별도 Neon DB 브랜치**를 만들어 씁니다. PR 검증 중
+넣은 시험 데이터가 운영 대장에 섞이지 않게 하기 위한 격리입니다.
+
+Neon Free 플랜은 프로젝트당 브랜치 개수에 한도가 있습니다. 머지·종료된 PR 의
+브랜치가 정리되지 않고 쌓이면 한도에 걸려 **Preview 배포가 실패**합니다.
+
+```
+Deployments — Branch limit reached. Upgrade your plan or delete unused branches.
+```
+
+이 메시지가 나오면 코드 문제가 아닙니다. Neon 콘솔 → **Branches** 에서
+`preview/...` 브랜치를 지우고 배포를 다시 걸면 됩니다.
+
+> **`production` / `main`(Primary) 브랜치는 지우지 마십시오.** 대장 실데이터가
+> 그 안에 있습니다. Production 배포는 브랜치를 만들지 않으므로, 이 오류가
+> 나더라도 운영 사이트는 영향을 받지 않습니다.
+
+브랜치 격리를 포기하면(Preview 도 운영 DB 사용) 이 문제는 없어지지만, PR
+검증 데이터가 운영 대장에 들어가게 됩니다. 격리를 유지하고 브랜치를 정리하는
+편이 낫습니다.
+
 
 ---
 
