@@ -13,6 +13,7 @@ import {
   setSession,
   clearSession,
   currentUser,
+  revokeSessions,
   audit,
   auditAttempt,
   sameOrigin,
@@ -20,6 +21,29 @@ import {
 
 /* 비밀번호를 틀렸을 때 아이디 존재 여부가 드러나지 않도록 응답을 통일합니다. */
 const BAD_LOGIN = '아이디 또는 비밀번호가 올바르지 않습니다.';
+
+/**
+ * 로그인 시도 제한
+ *
+ * 제한이 없으면 비밀번호를 무제한으로 추측할 수 있습니다. 최근 실패 횟수를
+ * audit_log 에서 세어 판단합니다. 시도 기록이 곧 제한의 근거가 되므로
+ * 별도 테이블을 두지 않습니다.
+ *
+ * 계정을 영구 잠그지는 않습니다. 잠금 해제를 관리자에게 의존하게 만들면
+ * 관리자가 한 명일 때 업무가 멈춥니다.
+ */
+const LOCK_WINDOW_MIN = 15;
+const LOCK_THRESHOLD = 5;
+
+async function recentFailures(username) {
+  const row = await one(
+    `SELECT count(*)::int AS n FROM audit_log
+      WHERE action = 'login.fail' AND actor = $1
+        AND at > now() - ($2 || ' minutes')::interval`,
+    [username, String(LOCK_WINDOW_MIN)]
+  );
+  return row?.n ?? 0;
+}
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
@@ -48,10 +72,22 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: '아이디와 비밀번호를 입력하십시오.' });
     }
 
+    const id = String(username).trim();
+
+    /* 실패가 쌓이면 잠시 막습니다. 계정 존재 여부와 무관하게 같은 기준을
+       적용해, 이 응답으로 아이디 실재를 알 수 없게 합니다. */
+    const fails = await recentFailures(id);
+    if (fails >= LOCK_THRESHOLD) {
+      await auditAttempt(id, 'login.block', `연속 실패 ${fails}회로 차단`);
+      return res.status(429).json({
+        error: `로그인 시도가 ${LOCK_THRESHOLD}회 실패했습니다. ${LOCK_WINDOW_MIN}분 후 다시 시도하거나 관리자에게 비밀번호 재설정을 요청하십시오.`,
+      });
+    }
+
     const row = await one(
-      `SELECT id, username, name, unit, role, password_hash, active
+      `SELECT id, username, name, unit, role, password_hash, active, session_epoch
          FROM users WHERE username = $1`,
-      [String(username).trim()]
+      [id]
     );
 
     /* 계정이 없어도 해시 검증을 한 번 수행해 응답 시간 차이를 줄입니다. */
@@ -71,7 +107,7 @@ export default async function handler(req, res) {
     }
 
     await query(`UPDATE users SET last_login_at = now() WHERE id = $1`, [row.id]);
-    setSession(res, row.id);
+    setSession(res, row.id, row.session_epoch);
 
     const user = {
       id: row.id,
@@ -102,7 +138,14 @@ export default async function handler(req, res) {
       await hashPassword(String(next)),
       user.id,
     ]);
-    await audit(user, 'password.change', user.username, null, null);
+
+    /* 비밀번호를 바꾸면 다른 곳에 남아 있던 세션을 모두 끊습니다. 그러지
+       않으면 세션이 탈취된 경우 비밀번호를 바꿔도 접근이 유지됩니다.
+       바꾼 본인은 새 세대로 쿠키를 다시 심어 로그아웃되지 않게 합니다. */
+    const epoch = await revokeSessions(user.id);
+    setSession(res, user.id, epoch);
+
+    await audit(user, 'password.change', user.username, null, '기존 세션 전체 해제');
     return res.status(200).json({ ok: true });
   }
 

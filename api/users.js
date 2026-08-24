@@ -14,7 +14,7 @@
  */
 import { randomBytes } from 'node:crypto';
 import { query, one } from '../lib/db.js';
-import { requireUser, hashPassword, audit, sameOrigin } from '../lib/auth.js';
+import { requireUser, hashPassword, audit, sameOrigin, revokeSessions } from '../lib/auth.js';
 
 const ROLES = ['admin', 'member', 'viewer'];
 
@@ -57,7 +57,10 @@ export default async function handler(req, res) {
         await hashPassword(password),
         target.id,
       ]);
-      await audit(user, 'user.reset', target.username, null, target.name);
+      /* 재설정한 계정이 다른 곳에 로그인해 있다면 즉시 끊습니다. 비밀번호를
+         바꿔도 기존 세션이 남으면 회수가 되지 않습니다. */
+      await revokeSessions(target.id);
+      await audit(user, 'user.reset', target.username, null, `${target.name} · 기존 세션 해제`);
       return res.status(200).json({ username: target.username, password });
     }
 
