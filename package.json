@@ -1,6 +1,6 @@
 {
   "name": "itgc-deployment-ledger",
-  "version": "2.11.0",
+  "version": "2.12.0",
   "private": true,
   "type": "module",
   "description": "ITGC PC-01/PD-02 배포 관리 대장",
@@ -8,8 +8,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "check": "node scripts/check.mjs && node scripts/test-judge.mjs && node scripts/test-sheet.mjs && node scripts/test-session.mjs && node scripts/test-csv.mjs",
-    "test": "node scripts/test-judge.mjs && node scripts/test-sheet.mjs && node scripts/test-session.mjs && node scripts/test-csv.mjs",
+    "check": "node scripts/check.mjs && node scripts/test-judge.mjs && node scripts/test-sheet.mjs && node scripts/test-session.mjs && node scripts/test-csv.mjs && node scripts/test-import.mjs",
+    "test": "node scripts/test-judge.mjs && node scripts/test-sheet.mjs && node scripts/test-session.mjs && node scripts/test-csv.mjs && node scripts/test-import.mjs",
     "migrate": "node scripts/migrate.mjs",
     "create-user": "node scripts/create-user.mjs"
   },
