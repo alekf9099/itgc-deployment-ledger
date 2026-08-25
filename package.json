@@ -3,7 +3,7 @@
   "version": "2.12.1",
   "private": true,
   "type": "module",
-  "description": "ITGC PC-01/PD-02 배포 관리 대장",
+  "description": "ITGC PC-01/PD-02 QA 검증 이력 대장",
   "engines": {
     "node": ">=20"
   },
