@@ -143,7 +143,7 @@ export default async function handler(req, res) {
       rows = [LEDGER_HEADER, ...buildLedgerRows(filtered.rows)];
       action = kind === 'backup' ? 'export.backup' : 'export.ledger';
       note = `${kind === 'backup' ? '전체 백업' : '대장'} · ${count}건 · ${filtered.scope}`;
-      filename = `배포관리대장${kind === 'backup' ? '_전체' : ''}_${new Date().toISOString().slice(0, 10)}.csv`;
+      filename = `QA검증이력대장${kind === 'backup' ? '_전체' : ''}_${new Date().toISOString().slice(0, 10)}.csv`;
     } else if (kind === 'check') {
       const id = String(req.query?.id ?? '').trim();
       if (!id) return res.status(400).json({ error: '점검 이력 식별자가 없습니다.' });

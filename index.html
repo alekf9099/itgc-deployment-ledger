@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>배포 관리 대장 · QA유닛</title>
+<title>QA 검증 이력 대장 · QA유닛</title>
 <link rel="preconnect" href="https://cdn.jsdelivr.net">
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet">
 <style>
@@ -318,7 +318,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 <body>
 
 <nav>
-  <div class="brand"><b>배포 관리 대장</b><span>ITGC PC-01 / PD-02 · QA유닛</span></div>
+  <div class="brand"><b>QA 검증 이력 대장</b><span>ITGC PC-01 / PD-02 · QA유닛</span></div>
   <button data-v="ledger" aria-current="true"><i>01</i>대장</button>
   <button data-v="check"><i>02</i>월간 점검</button>
   <button data-v="std"><i>03</i>작성 기준</button>
@@ -338,7 +338,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
   <section id="v-ledger">
     <div class="head">
       <div>
-        <h1>배포 관리 대장</h1>
+        <h1>QA 검증 이력 대장</h1>
         <p class="sub">이 목록 전체가 PC-01 모집단입니다. 배포 이력 전수를 기재하고, 각 건을 증적 문서와 1:1로 연결합니다. 판정 스트립의 붉은 칸이 조치가 필요한 항목입니다.</p>
       </div>
       <div style="display:flex;gap:8px">
@@ -621,7 +621,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 <!-- 인증 확인이 끝날 때까지 대장이 보이지 않도록 기본값을 표시 상태로 둡니다. -->
 <div class="gate on" id="gate">
   <form id="loginForm" autocomplete="on">
-    <h2>배포 관리 대장</h2>
+    <h2>QA 검증 이력 대장</h2>
     <p class="g">ITGC PC-01 / PD-02 · QA유닛<br>담당자 계정으로 로그인하십시오.</p>
     <div class="err" id="loginErr"></div>
     <label class="f"><span>아이디</span>
@@ -734,7 +734,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.12.1';
+const APP_VERSION='2.13.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -1403,7 +1403,7 @@ function exportLedger(){
     kind:'ledger',
     q:$('q').value.trim(), type:$('fType').value, verdict:$('fVerdict').value,
     from:$('fFrom').value, to:$('fTo').value,
-    name:`배포관리대장_${fmt(new Date())}.csv`,
+    name:`QA검증이력대장_${fmt(new Date())}.csv`,
   });
 }
 
@@ -1721,7 +1721,7 @@ $('impApply').onclick=async()=>{
 $('stReload').onclick=()=>{ loadStorage(); loadExports(); loadSheetStatus(); };
 $('stExport').onclick=async()=>{
   if(!DATA.length) return toast('반출할 배포 건이 없습니다');
-  await downloadExport({kind:'backup',name:`배포관리대장_전체_${fmt(new Date())}.csv`});
+  await downloadExport({kind:'backup',name:`QA검증이력대장_전체_${fmt(new Date())}.csv`});
   loadStorage();
 };
 
