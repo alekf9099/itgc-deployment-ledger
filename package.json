@@ -1,6 +1,6 @@
 {
   "name": "itgc-deployment-ledger",
-  "version": "2.12.1",
+  "version": "2.13.0",
   "private": true,
   "type": "module",
   "description": "ITGC PC-01/PD-02 QA 검증 이력 대장",
