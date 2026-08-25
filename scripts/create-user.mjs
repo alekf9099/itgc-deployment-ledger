@@ -23,10 +23,10 @@ import { connect } from './_client.mjs';
 
 const scrypt = promisify(_scrypt);
 
-const [username, name, role = 'member', unit = null] = process.argv.slice(2);
+const [username, name, role = 'member', unit = null, given = null] = process.argv.slice(2);
 
 if (!username || !name) {
-  console.error('사용법: node scripts/create-user.mjs <username> <성명> [권한] [소속유닛]');
+  console.error('사용법: node scripts/create-user.mjs <username> <성명> [권한] [소속유닛] [비밀번호]');
   process.exit(1);
 }
 if (!['admin', 'member', 'viewer'].includes(role)) {
@@ -36,9 +36,16 @@ if (!['admin', 'member', 'viewer'].includes(role)) {
 
 /* 사람이 옮겨 적을 수 있도록 혼동되는 글자(0/O, 1/l/I)를 뺀 문자집합을 씁니다. */
 const ALPHABET = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const password = Array.from(randomBytes(16))
-  .map((b) => ALPHABET[b % ALPHABET.length])
-  .join('');
+/* 비밀번호를 주지 않으면 임의로 만듭니다. */
+if (given !== null && String(given).length < 10) {
+  console.error('비밀번호는 10자 이상이어야 합니다.');
+  process.exit(1);
+}
+const password =
+  given ??
+  Array.from(randomBytes(16))
+    .map((b) => ALPHABET[b % ALPHABET.length])
+    .join('');
 
 const salt = randomBytes(16).toString('hex');
 const key = await scrypt(password, salt, 64);
@@ -47,13 +54,14 @@ const hash = `scrypt$${salt}$${key.toString('hex')}`;
 const client = await connect();
 try {
   const { rows } = await client.query(
-    `INSERT INTO users (username, name, unit, role, password_hash)
-          VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO users (username, name, unit, role, password_hash, must_change_password)
+          VALUES ($1, $2, $3, $4, $5, TRUE)
      ON CONFLICT (username) DO UPDATE
             SET name = EXCLUDED.name,
                 unit = EXCLUDED.unit,
                 role = EXCLUDED.role,
                 password_hash = EXCLUDED.password_hash,
+                must_change_password = TRUE,
                 active = TRUE
        RETURNING id, username, name, unit, role, (xmax = 0) AS created`,
     [username, name, unit, role, hash]

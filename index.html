@@ -522,7 +522,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 
     <div class="panel" id="uAdd" hidden>
       <h3><i>+</i>계정 추가</h3>
-      <p>아이디는 이후 변경할 수 없습니다. 사내 계정 체계와 일치시키십시오. 통제검토부서(TA유닛)와 감사인에게는 열람 전용을 발급합니다.</p>
+      <p>아이디는 이후 변경할 수 없습니다. 사내 계정 체계와 일치시키십시오. 통제검토부서(TA유닛)와 감사인에게는 열람 전용을 발급합니다. <b>비밀번호를 직접 정하려면 입력하고, 비우면 자동으로 만듭니다(10자 이상).</b> 어느 쪽이든 본인이 최초 로그인 시 반드시 변경해야 대장을 이용할 수 있습니다.</p>
       <div class="bar" style="margin:0">
         <label class="f"><span>아이디<em>*</em></span><input type="text" id="uUser" style="width:210px" autocomplete="off"></label>
         <label class="f"><span>성명<em>*</em></span><input type="text" id="uName" style="width:130px"></label>
@@ -532,6 +532,8 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
           <option value="viewer">열람 전용</option>
           <option value="admin">관리자</option>
         </select></label>
+        <label class="f"><span>비밀번호</span>
+          <input type="text" id="uPwSet" style="width:190px" placeholder="비우면 자동 생성" autocomplete="off"></label>
         <button class="btn" id="uCreate">발급</button>
         <button class="btn ghost" id="uCancel">취소</button>
       </div>
@@ -635,8 +637,8 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 
 <div class="modal" id="pwModal">
   <form id="pwForm">
-    <h2>비밀번호 변경</h2>
-    <p class="m">최초 로그인 시 발급받은 임시 비밀번호는 반드시 변경하십시오.<br>새 비밀번호는 10자 이상이어야 합니다.</p>
+    <h2 id="pwTitle">비밀번호 변경</h2>
+    <p class="m" id="pwLead">최초 로그인 시 발급받은 비밀번호는 반드시 변경하십시오.<br>새 비밀번호는 10자 이상이어야 합니다.</p>
     <div class="err" id="pwErr"></div>
     <label class="f"><span>현재 비밀번호</span>
       <input type="password" id="pwCur" autocomplete="current-password" required></label>
@@ -734,7 +736,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.13.0';
+const APP_VERSION='2.14.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -752,7 +754,7 @@ async function api(path,opt={}){
   let data=null;
   try{ data=await res.json(); }catch(e){}
   if(!res.ok) throw new ApiError(data?.error||`요청에 실패했습니다 (${res.status})`,res.status,
-    {conflict:!!data?.conflict});
+    {conflict:!!data?.conflict,mustChangePassword:!!data?.mustChangePassword});
   return data;
 }
 
@@ -1097,6 +1099,8 @@ async function del(){
 /* 세션이 끊긴 경우와 그 밖의 오류를 구분해 처리합니다. */
 function fail(e){
   if(e instanceof ApiError && e.status===401){ ME=null; showGate('세션이 만료되었습니다. 다시 로그인하십시오.'); return; }
+  /* 비밀번호를 바꾸기 전에는 서버가 막습니다. 변경 화면으로 유도합니다. */
+  if(e instanceof ApiError && e.status===403 && e.mustChangePassword){ pwOpen(true); return; }
   /* 동시 수정 충돌은 최신 내용을 다시 불러와야 하므로 따로 안내합니다. */
   if(e instanceof ApiError && e.status===409 && e.conflict){
     alert(e.message);
@@ -1726,14 +1730,29 @@ $('stExport').onclick=async()=>{
 };
 
 /* ══════════════ 비밀번호 변경 ══════════════ */
-function pwOpen(){
+/* 발급·재설정된 비밀번호를 아직 바꾸지 않은 상태. 닫을 수 없습니다. */
+let pwForced=false;
+
+function pwOpen(forced){
+  pwForced=!!forced;
   ['pwCur','pwNew','pwNew2'].forEach(id=>$(id).value='');
   $('pwErr').classList.remove('on');
+
+  $('pwTitle').textContent=pwForced?'비밀번호를 변경해야 합니다':'비밀번호 변경';
+  $('pwLead').innerHTML=pwForced
+    ? '발급받은 비밀번호는 <b>관리자가 알고 있는 값</b>입니다. 바꾸기 전에는 대장을 이용할 수 없습니다.<br>현재 비밀번호란에 발급받은 값을 넣고 새 비밀번호를 정하십시오 (10자 이상).'
+    : '최초 로그인 시 발급받은 비밀번호는 반드시 변경하십시오.<br>새 비밀번호는 10자 이상이어야 합니다.';
+  /* 강제 상태에서는 취소로 빠져나갈 수 없게 합니다. */
+  $('pwCancel').hidden=pwForced;
+
   $('pwModal').classList.add('on');
   setTimeout(()=>$('pwCur').focus(),60);
 }
-function pwClose(){ $('pwModal').classList.remove('on'); }
-$('pwOpen').onclick=pwOpen;
+function pwClose(){
+  if(pwForced) return;   /* 바꾸기 전에는 닫히지 않습니다 */
+  $('pwModal').classList.remove('on');
+}
+$('pwOpen').onclick=()=>pwOpen(false);
 $('pwCancel').onclick=pwClose;
 $('pwModal').addEventListener('click',e=>{ if(e.target===$('pwModal')) pwClose(); });
 
@@ -1749,7 +1768,12 @@ $('pwForm').addEventListener('submit',async e=>{
   const btn=$('pwSave'); btn.disabled=true;
   try{
     await api('/api/auth',{method:'POST',body:{action:'password',current:cur,next}});
-    pwClose(); toast('비밀번호를 변경했습니다');
+    const wasForced=pwForced;
+    pwForced=false;
+    $('pwModal').classList.remove('on');
+    toast('비밀번호를 변경했습니다');
+    /* 강제 변경이었으면 이제야 대장을 쓸 수 있으므로 화면을 채웁니다. */
+    if(wasForced&&ME){ ME.mustChangePassword=false; await boot(); }
   }catch(ex){
     if(ex instanceof ApiError && ex.status===401 && /현재 비밀번호/.test(ex.message)) show(ex.message);
     else if(ex instanceof ApiError && ex.status===401) fail(ex);
@@ -1805,7 +1829,7 @@ $('uPwCopy').onclick=async()=>{
 
 $('uAddOpen').onclick=()=>{
   $('uAdd').hidden=false;
-  ['uUser','uName','uUnit'].forEach(id=>$(id).value='');
+  ['uUser','uName','uUnit','uPwSet'].forEach(id=>$(id).value='');
   $('uRole').value='member';
   $('uUser').focus();
 };
@@ -1813,7 +1837,8 @@ $('uCancel').onclick=()=>{ $('uAdd').hidden=true; };
 
 $('uCreate').onclick=async()=>{
   const body={username:$('uUser').value.trim(),name:$('uName').value.trim(),
-    unit:$('uUnit').value.trim(),role:$('uRole').value};
+    unit:$('uUnit').value.trim(),role:$('uRole').value,
+    password:$('uPwSet').value.trim()};
   if(!body.username||!body.name) return toast('아이디와 성명을 입력하십시오');
   const btn=$('uCreate'); btn.disabled=true;
   try{
@@ -1842,9 +1867,12 @@ $('uRows').addEventListener('click',async e=>{
   const rid=e.target.dataset.reset;
   if(rid){
     const u=USERS.find(x=>x.id===+rid);
-    if(!confirm(`${u.name}(${u.username})의 비밀번호를 재설정합니다.\n\n기존 비밀번호는 즉시 사용할 수 없게 됩니다. 진행하시겠습니까?`)) return;
+    /* 비우면 자동으로 만듭니다. 어느 쪽이든 최초 로그인 시 변경을 강제합니다. */
+    const given=prompt(`${u.name}(${u.username})의 비밀번호를 재설정합니다.\n\n정할 비밀번호를 입력하십시오 (10자 이상).\n비우고 확인하면 임의로 만듭니다.\n\n기존 비밀번호와 로그인은 즉시 끊깁니다.`,'');
+    if(given===null) return;
     try{
-      const r=await api('/api/users',{method:'POST',body:{action:'reset',id:u.id}});
+      const r=await api('/api/users',{method:'POST',
+        body:{action:'reset',id:u.id,password:given.trim()}});
       showPw('비밀번호를 재설정했습니다',r.username,r.password);
     }catch(err){ fail(err); }
     return;
@@ -1958,7 +1986,9 @@ $('loginForm').addEventListener('submit',async e=>{
   try{
     const {user}=await api('/api/auth',{method:'POST',
       body:{action:'login',username:$('lgUser').value.trim(),password:$('lgPw').value}});
-    ME=user; hideGate(); await boot();
+    ME=user; hideGate();
+    if(user.mustChangePassword) pwOpen(true);
+    else await boot();
   }catch(err){
     const box=$('loginErr'); box.textContent=err.message; box.classList.add('on');
     $('lgPw').value=''; $('lgPw').focus();
@@ -2018,7 +2048,10 @@ async function boot(){
   renderStd();
   try{
     const {user}=await api('/api/auth');
-    if(user){ ME=user; hideGate(); await boot(); } else showGate();
+    if(user){
+      ME=user; hideGate();
+      if(user.mustChangePassword) pwOpen(true); else await boot();
+    } else showGate();
   }catch(err){
     showGate('서버에 연결하지 못했습니다. 잠시 후 다시 시도하십시오.');
     console.error(err);

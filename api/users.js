@@ -2,8 +2,13 @@
  * 계정 관리 (admin 전용)
  *
  *   GET    /api/users                                   계정 목록
- *   POST   /api/users  { username, name, unit, role }   계정 생성 (임시 비밀번호 발급)
- *   POST   /api/users  { action:'reset', id }           비밀번호 재설정
+ *   POST   /api/users  { username, name, unit, role, password? }  계정 생성
+ *   POST   /api/users  { action:'reset', id, password? }          비밀번호 재설정
+ *
+ * password 를 주면 그 값으로, 주지 않으면 임의로 만듭니다. 어느 쪽이든
+ * must_change_password 를 세워 최초 로그인 시 변경하게 합니다. 발급한
+ * 비밀번호는 관리자가 알고 있는 값이라, 바꾸기 전까지는 그 계정의 기록이
+ * 본인 것이라고 단정할 수 없습니다.
  *   PATCH  /api/users  { id, name?, unit?, role?, active? }
  *
  * 계정은 삭제하지 않습니다. 비활성화만 합니다. 그 계정이 남긴 변경 이력의
@@ -26,8 +31,26 @@ function tempPassword() {
     .join('');
 }
 
-const LIST = `SELECT id, username, name, unit, role, active, created_at, last_login_at
+const LIST = `SELECT id, username, name, unit, role, active, created_at, last_login_at,
+                     must_change_password
                 FROM users ORDER BY active DESC, role, username`;
+
+const MIN_LENGTH = 10;
+
+/**
+ * 관리자가 지정한 비밀번호를 검사합니다.
+ *
+ * 지정 값은 관리자가 알고 있으므로 최초 로그인 시 변경을 강제합니다.
+ * 그래도 첫 로그인까지는 쓰이는 값이라 최소 조건은 봅니다.
+ */
+function checkGiven(password, username) {
+  const p = String(password);
+  if (p.length < MIN_LENGTH) return `비밀번호는 ${MIN_LENGTH}자 이상이어야 합니다.`;
+  if (username && p.toLowerCase() === String(username).toLowerCase()) {
+    return '비밀번호를 아이디와 같게 정할 수 없습니다.';
+  }
+  return null;
+}
 
 export default async function handler(req, res) {
   const user = await requireUser(req, res, 'admin');
@@ -52,15 +75,23 @@ export default async function handler(req, res) {
       ]);
       if (!target) return res.status(404).json({ error: '계정을 찾을 수 없습니다.' });
 
-      const password = tempPassword();
-      await query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [
-        await hashPassword(password),
-        target.id,
-      ]);
+      /* 값을 주지 않으면 임의로 만듭니다. */
+      const given = String(body.password ?? '').trim();
+      if (given) {
+        const bad = checkGiven(given, target.username);
+        if (bad) return res.status(400).json({ error: bad });
+      }
+      const password = given || tempPassword();
+
+      await query(
+        `UPDATE users SET password_hash = $1, must_change_password = TRUE WHERE id = $2`,
+        [await hashPassword(password), target.id]
+      );
       /* 재설정한 계정이 다른 곳에 로그인해 있다면 즉시 끊습니다. 비밀번호를
          바꿔도 기존 세션이 남으면 회수가 되지 않습니다. */
       await revokeSessions(target.id);
-      await audit(user, 'user.reset', target.username, null, `${target.name} · 기존 세션 해제`);
+      await audit(user, 'user.reset', target.username, null,
+        `${target.name} · ${given ? '지정 비밀번호' : '임의 비밀번호'} · 기존 세션 해제`);
       return res.status(200).json({ username: target.username, password });
     }
 
@@ -80,15 +111,23 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: '이미 사용 중인 아이디입니다.' });
     }
 
-    const password = tempPassword();
+    const given = String(body.password ?? '').trim();
+    if (given) {
+      const bad = checkGiven(given, username);
+      if (bad) return res.status(400).json({ error: bad });
+    }
+    const password = given || tempPassword();
+
     const row = await one(
-      `INSERT INTO users (username, name, unit, role, password_hash)
-            VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, username, name, unit, role, active, created_at, last_login_at`,
+      `INSERT INTO users (username, name, unit, role, password_hash, must_change_password)
+            VALUES ($1, $2, $3, $4, $5, TRUE)
+         RETURNING id, username, name, unit, role, active, created_at, last_login_at,
+                   must_change_password`,
       [username, name, unit, role, await hashPassword(password)]
     );
 
-    await audit(user, 'user.create', username, { 권한: ['', role] }, name);
+    await audit(user, 'user.create', username, { 권한: ['', role] },
+      `${name} · ${given ? '지정 비밀번호' : '임의 비밀번호'}`);
     return res.status(200).json({ user: row, password });
   }
 
