@@ -77,6 +77,7 @@ QA유닛이 운영하는 배포 관리 대장입니다. 배포 이력 전수를 
 | `lib/entry.js` | 배포 건 필드 정의 |
 | `lib/sheet.js` | 엑셀 양식 레이아웃 |
 | `lib/google.js` | 서비스 계정 인증, Sheets API 호출 |
+| `lib/pem.js` | 비공개 키 형태 정리 (escape·따옴표·JSON·base64) |
 | `lib/settings.js` | 운영 설정 (자동 반사 여부) |
 | `lib/csv.js` | CSV 생성 · 수식 주입 방어 · 해시 |
 | `db/schema.sql` | 테이블 정의 |
@@ -88,6 +89,7 @@ QA유닛이 운영하는 배포 관리 대장입니다. 배포 이력 전수를 
 | `scripts/test-session.mjs` | 세션 토큰 서명·세대·만료 검증 (CI에서 실행) |
 | `scripts/test-csv.mjs` | 반출본 형식·수식 주입 방어·해시 검증 (CI에서 실행) |
 | `scripts/test-import.mjs` | 시트 반입 매핑·검증 (CI에서 실행) |
+| `scripts/test-pem.mjs` | 서비스 계정 키 정리·서명 검증 (CI에서 실행) |
 | `docs/USER_GUIDE.md` | 화면별 사용 안내서 |
 | `docs/QA-LG-001_…xlsx` | 원본 엑셀 대장 |
 
