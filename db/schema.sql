@@ -20,10 +20,13 @@ CREATE TABLE IF NOT EXISTS users (
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_login_at TIMESTAMPTZ,
   -- 세션 세대. 비밀번호가 바뀌면 올려서 이전 세션을 모두 무효로 만듭니다.
-  session_epoch INTEGER     NOT NULL DEFAULT 0
+  session_epoch INTEGER     NOT NULL DEFAULT 0,
+  -- 발급·재설정된 비밀번호는 관리자가 알고 있으므로 최초 로그인 시 바꾸게 합니다.
+  must_change_password BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS session_epoch INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE;
 
 COMMENT ON COLUMN users.role IS
   'admin: 계정 관리 및 삭제 가능 / member: 대장 작성·점검 수행 / viewer: 열람만';

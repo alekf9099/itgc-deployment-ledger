@@ -47,7 +47,13 @@ async function recentFailures(username) {
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
-    const user = await currentUser(req);
+    const u = await currentUser(req);
+    const user = u
+      ? {
+          id: u.id, username: u.username, name: u.name, unit: u.unit, role: u.role,
+          mustChangePassword: u.must_change_password,
+        }
+      : null;
     return res.status(200).json({ user });
   }
 
@@ -85,7 +91,8 @@ export default async function handler(req, res) {
     }
 
     const row = await one(
-      `SELECT id, username, name, unit, role, password_hash, active, session_epoch
+      `SELECT id, username, name, unit, role, password_hash, active, session_epoch,
+              must_change_password
          FROM users WHERE username = $1`,
       [id]
     );
@@ -115,6 +122,7 @@ export default async function handler(req, res) {
       name: row.name,
       unit: row.unit,
       role: row.role,
+      mustChangePassword: row.must_change_password,
     };
     await audit(user, 'login', row.username, null, null);
     return res.status(200).json({ user });
@@ -134,10 +142,11 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: '현재 비밀번호가 올바르지 않습니다.' });
     }
 
-    await query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [
-      await hashPassword(String(next)),
-      user.id,
-    ]);
+    /* 바꿨으므로 최초 변경 요구를 해제합니다. */
+    await query(
+      `UPDATE users SET password_hash = $1, must_change_password = FALSE WHERE id = $2`,
+      [await hashPassword(String(next)), user.id]
+    );
 
     /* 비밀번호를 바꾸면 다른 곳에 남아 있던 세션을 모두 끊습니다. 그러지
        않으면 세션이 탈취된 경우 비밀번호를 바꿔도 접근이 유지됩니다.
