@@ -36,6 +36,9 @@ jobs:
       # 판정 열을 반입하게 되면 시트에서 판정을 고칠 수 있으므로 매핑을 고정합니다.
       - name: 시트 반입 매핑·검증
         run: node scripts/test-import.mjs
+      # 환경변수에 키를 넣는 형태가 사람마다 달라, 어느 쪽이든 서명이 되어야 합니다.
+      - name: 서비스 계정 키 정리 검증
+        run: node scripts/test-pem.mjs
       - name: 서버 코드 문법 검사
         run: |
           for f in api/*.js lib/*.js; do node --check "$f"; done
