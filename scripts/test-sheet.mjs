@@ -29,7 +29,8 @@ const eq = (a, b, label) => {
 /* ── 열 문자 ── */
 eq(colName(1), 'A', '1열은 A');
 eq(colName(26), 'Z', '26열은 Z');
-eq(colName(28), 'AB', '28열은 AB (양식의 마지막 열)');
+eq(colName(28), 'AB', '28열은 AB (원본 양식의 마지막 열)');
+eq(colName(40), 'AN', '40열은 AN (현재 마지막 열)');
 
 /* ── 머리글이 양식 파일과 일치하는지 ── */
 const here = dirname(fileURLToPath(import.meta.url));
@@ -57,9 +58,16 @@ sys.stdout.write(json.dumps(out, ensure_ascii=False))
   console.warn('양식 파일을 읽지 못해 머리글 대조를 건너뜁니다:', e.message.split('\n')[0]);
 }
 
+/* 보고서 V2 대응 열은 양식 뒤에 덧붙였습니다. 원본 양식 파일은 아직 28열이므로,
+   앞쪽 28열이 그대로인지만 봅니다. 기존 열의 이름이 바뀌거나 순서가 밀리면
+   여기서 잡히고, 뒤에 붙인 열은 아래에서 따로 확인합니다. */
 if (templateHeader) {
-  eq(LEDGER_HEADER, templateHeader, '머리글이 양식 5행과 일치');
+  eq(LEDGER_HEADER.slice(0, templateHeader.length), templateHeader,
+    '앞쪽 열은 양식 5행과 그대로 일치');
 }
+eq(LEDGER_HEADER.length, 40, '보고서 V2 대응 열을 더해 40열');
+eq(LEDGER_HEADER[30], '검증 완료일', '검증 완료일은 AE열');
+eq(LEDGER_HEADER[27], '비고', '기존 마지막 열(비고)은 자리를 지킴');
 
 /* ── 대장 행 ── */
 const clean = {
@@ -68,6 +76,8 @@ const clean = {
   appr: '최승인', apprd: '2026-08-14', schema: '없음', int: '', intby: '',
   reg: '2026-08-19', path: '게시판 > 릴리즈노트', state: '등록완료',
   exc: '', memo: '',
+  vdate: '2026-08-14', qajudge: '박검증', qajd: '2026-08-14',
+  req: '일치', reqby: '김동완', holdc: '', holdh: '', rel: '', plan: '',
 };
 const older = { ...clean, id: 'QA-R-20260801-01', date: '2026-08-01', type: '정규' };
 
@@ -104,13 +114,13 @@ eq(sparse[19], '', '판정 불가 항목은 공란');
 
 /* ── 범위 ── */
 const up = ledgerUpdate(rows);
-eq(up.range, `'배포관리대장'!A6:AB7`, '2건이면 6~7행');
-eq(ledgerUpdate([]).range, `'배포관리대장'!A6:AB6`, '0건이어도 범위가 뒤집히지 않음');
+eq(up.range, `'배포관리대장'!A6:AN7`, '2건이면 6~7행');
+eq(ledgerUpdate([]).range, `'배포관리대장'!A6:AN6`, '0건이어도 범위가 뒤집히지 않음');
 eq(ledgerUpdate([]).values.length, 1, '0건이면 빈 행 하나를 써서 이전 값을 지움');
 eq(LEDGER_FIRST_ROW, 6, '데이터 시작 행은 6');
 
-eq(ledgerClearRange(2), `'배포관리대장'!A8:AB1000`, '데이터 다음 행부터 비움');
-eq(ledgerClearRange(994, 1000), `'배포관리대장'!A1000:AB1000`, '마지막 한 행만 남은 경우');
+eq(ledgerClearRange(2), `'배포관리대장'!A8:AN1000`, '데이터 다음 행부터 비움');
+eq(ledgerClearRange(994, 1000), `'배포관리대장'!A1000:AN1000`, '마지막 한 행만 남은 경우');
 eq(ledgerClearRange(995, 1000), null, '시작이 끝을 넘으면 null (범위가 뒤집히지 않음)');
 eq(ledgerClearRange(1000, 1000), null, '비울 범위가 없으면 null');
 
@@ -142,23 +152,23 @@ eq(at('C25'), 1, '증적 매핑 누락 건수 (25행)');
 eq(at('E25'), 'ID 부여 완료', '증적 매핑 조치 내용');
 eq(at('C26'), 2, '배포 승인 기록 누락 건수 (26행)');
 eq(at('C27'), 0, '값이 없는 항목은 0');
-eq(at('C35'), 1, '확인 항목 예외 승인 건수 (35행)');
-eq(at('B49'), 10, '종합 모집단');
-eq(at('B50'), 3, '확인필요 건수');
-eq(at('B51'), 2, '지적 항목 수');
-eq(at('B52'), '보완 필요', '점검 결과');
-eq(at('B59'), '김홍현', '점검자 서명');
-eq(at('B60'), '최책임', '확인자 서명');
+eq(at('C38'), 1, '확인 항목 예외 승인 건수 (지적 12종 다음, 한 행 띄워 38행)');
+eq(at('B53'), 10, '종합 모집단');
+eq(at('B54'), 3, '확인필요 건수');
+eq(at('B55'), 2, '지적 항목 수');
+eq(at('B56'), '보완 필요', '점검 결과');
+eq(at('B63'), '김홍현', '점검자 서명');
+eq(at('B64'), '최책임', '확인자 서명');
 
 const clean2 = checkUpdates({ ...check, defects: 0, items: [] }, []);
-eq(clean2.find((u) => u.range.endsWith('!B52')).values[0][0], '적정 (지적사항 없음)',
+eq(clean2.find((u) => u.range.endsWith('!B56')).values[0][0], '적정 (지적사항 없음)',
   '지적 0건이면 적정');
 eq(checkUpdates({ ...check, popCount: 10 }, []).find((u) => u.range.endsWith('!C18')).values[0][0],
   '일치', '건수가 같으면 일치');
 eq(checkUpdates({ ...check, popCount: '' }, []).find((u) => u.range.endsWith('!C18')).values[0][0],
   '미입력', '건수 미입력');
 
-const hist = ups.find((u) => u.range.includes('A66'));
+const hist = ups.find((u) => u.range.includes('A70'));
 eq(!!hist, true, '점검 이력 범위 생성');
 eq(hist.values[0], ['2026-08-01 ~ 2026-08-31', '2026-09-01', '김홍현', 2], '이력 행 구성');
 

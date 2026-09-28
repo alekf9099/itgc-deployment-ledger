@@ -9,7 +9,7 @@
  */
 import { query, one } from '../lib/db.js';
 import { requireUser, audit, sameOrigin } from '../lib/auth.js';
-import { COLS, toRow, toClient, diff } from '../lib/entry.js';
+import { COLS, toRow, toClient, diff, validateEntry } from '../lib/entry.js';
 
 /* 증적 문서 ID 유니크 인덱스 위반 */
 const UNIQUE_VIOLATION = '23505';
@@ -47,12 +47,18 @@ export default async function handler(req, res) {
       ['type', '릴리즈 구분'],
       ['sys', '대상 시스템'],
       ['judge', '유형 판정자'],
+      /* 증적 문서 ID 의 기준일이라 비어 있으면 ID 를 대조할 수 없습니다. */
+      ['vdate', '검증 완료일'],
     ]
       .filter(([key]) => !String(body[key] ?? '').trim())
       .map(([, label]) => label);
     if (missing.length) {
       return res.status(400).json({ error: `${missing.join(', ')}을(를) 입력하십시오.` });
     }
+
+    /* 형식·허용값 검증. 시트 반입과 같은 규칙을 씁니다. */
+    const bad = validateEntry(body);
+    if (bad.length) return res.status(400).json({ error: bad.join(' / ') });
 
     const values = toRow(body);
     const before = await one(
