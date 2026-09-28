@@ -83,11 +83,55 @@ const clean = {
   date: '2026-08-14', type: '수시', id: 'QA-A-20260814-01', judge: '김판정',
   dev: '이개발', qa: '박검증', appr: '최승인', apprd: '2026-08-14',
   schema: '없음', int: '', intby: '', reg: '2026-08-19', state: '등록완료',
+  /* 보고서 V2 대응 항목 */
+  vdate: '2026-08-14', qav: '통과', qajudge: '박검증', qajd: '2026-08-14',
+  req: '일치', reqby: '김동완', holdc: '', holdh: '', rel: '', plan: '', memo: '',
 };
 eq(judge(clean).flag, false, '이상 없는 건은 확인필요 아님');
 eq(judge(clean).overall, '정상', '이상 없는 건의 종합 판정은 정상');
 eq(judge({ ...clean, apprd: '' }).overall, '확인필요', '한 항목만 이상이어도 확인필요');
 eq(judge({ ...clean, date: '' }).overall, null, '배포일 없으면 종합 판정 없음');
+
+/* ── 증적 문서 ID 의 기준일은 검증 완료일 ── */
+/* 보고서 V2 — ID 는 최종 회차 검증 완료일 기준으로 부여합니다.
+   사후 검증 건에서 배포일로 대조하면 보고서와 대장의 ID 가 갈립니다. */
+eq(judge({ ...clean, date: '2026-08-14', vdate: '2026-08-20', id: 'QA-20260820-01' }).idc, 'ok',
+  '날짜부는 검증 완료일과 맞으면 정상 (배포일과 달라도 됨)');
+eq(judge({ ...clean, date: '2026-08-14', vdate: '2026-08-20', id: 'QA-20260814-01' }).idc, 'bad',
+  '배포일로 부여한 ID 는 불일치');
+eq(judge({ ...clean, date: '2026-08-14', vdate: '', id: 'QA-20260814-01' }).idc, 'ok',
+  '검증 완료일이 비면 배포일로 대조 (기존 기록 보호)');
+
+/* ── 검증 완료일 ── */
+eq(judge({ ...clean, vdate: '2026-08-14' }).vfy, 'ok', '배포일과 같으면 정상');
+eq(judge({ ...clean, vdate: '2026-08-13' }).vfy, 'ok', '배포 전 검증은 정상');
+eq(judge({ ...clean, vdate: '' }).vfy, 'bad', '미기재는 미비');
+eq(judge({ ...clean, vdate: '2026-08-20', id: 'QA-20260820-01', memo: '' }).vfy, 'bad',
+  '사후 검증인데 사유가 없으면 미비');
+eq(judge({ ...clean, vdate: '2026-08-20', id: 'QA-20260820-01', memo: '배포 후 검증 · 사유 기재' }).vfy,
+  'ok', '사후 검증이어도 사유가 있으면 정상');
+eq(judge({ ...clean, date: '' }).vfy, null, '배포일 없으면 미판정');
+
+/* ── QA 판정 적정성 ── */
+eq(judge({ ...clean, qav: '통과', holdc: '0', holdh: '0' }).verd, 'ok', '보류 0건 + 통과');
+eq(judge({ ...clean, qav: '통과', holdc: '1' }).verd, 'bad', '즉시·긴급 보류가 남으면 통과 불가');
+eq(judge({ ...clean, qav: '통과', holdh: '2' }).verd, 'bad', '높음 보류가 남으면 통과 불가');
+eq(judge({ ...clean, qav: '조건부 통과', holdh: '2' }).verd, 'ok', '조건부 통과는 허용');
+eq(judge({ ...clean, qav: '실패', holdc: '3' }).verd, 'ok', '실패는 허용');
+eq(judge({ ...clean, qav: '통과', qajudge: '' }).verd, 'bad', '판정자 없으면 부적정');
+eq(judge({ ...clean, qav: '통과', qajd: '' }).verd, 'bad', '판정일 없으면 부적정');
+eq(judge({ ...clean, qav: '' }).verd, null, '판정이 없으면 미판정');
+eq(judge({ ...clean, qav: '통과', holdc: '', holdh: '' }).verd, 'ok',
+  '보류 건수를 비워두면 건수 대조는 하지 않음');
+
+/* ── 요구사항 일치 ── */
+eq(judge({ ...clean, req: '일치', reqby: '김동완' }).reqm, 'ok', '일치 + 확인자');
+eq(judge({ ...clean, req: '일치(범위 조정)', reqby: '김동완' }).reqm, 'ok', '범위 조정도 정상');
+eq(judge({ ...clean, req: '', reqby: '김동완' }).reqm, 'bad', '일치 여부 미기재는 미확인');
+eq(judge({ ...clean, req: '일치', reqby: '' }).reqm, 'bad', '확인자 미기재는 미확인');
+eq(judge({ ...clean, req: '불일치', qav: '통과' }).reqm, 'bad', '불일치인데 통과 판정은 미확인');
+eq(judge({ ...clean, req: '불일치', qav: '조건부 통과' }).reqm, 'ok', '불일치 + 조건부 통과는 정상');
+eq(judge({ ...clean, date: '' }).reqm, null, '배포일 없으면 미판정');
 
 /* ── 월간 점검 집계 ── */
 /* 날짜를 바꿀 때 ID 와 등록일도 함께 맞춥니다. 그러지 않으면 검사하려는
@@ -97,6 +141,8 @@ function mk(date, over = {}) {
     ...clean,
     date,
     id: `QA-A-${date.replaceAll('-', '')}-01`,
+    vdate: date, // ID 의 기준일이므로 날짜를 바꾸면 함께 맞춥니다
+    qajd: date,
     reg: date, // 배포일 등록이면 어떤 유형이든 기한 이내
     ...over,
   };
@@ -113,13 +159,16 @@ const all = [
   mk('2026-08-27', { int: '완료' }),             // 입력 오류 (없음 + 값)
   mk('2026-07-01', { state: '보완필요' }),       // 기간 밖 · 보완필요
   mk('2026-08-28', { state: '예외승인' }),       // 확인 항목
-  mk('2026-08-31', { qav: '실패(반려)' }),       // 확인 항목
+  mk('2026-08-31', { qav: '실패(반려)' }),       // 확인 항목 (이전 표기)
+  mk('2026-08-18', { vdate: '' }),              // 검증 완료일 미기재
+  mk('2026-08-19', { holdc: '2' }),             // 보류 잔존인데 통과 판정
+  mk('2026-08-13', { req: '' }),                // 요구사항 일치 미기재
 ];
 
 const s = computeSummary(all, '2026-08-01', '2026-08-31');
 const n = (key) => s.items.find((i) => i.key === key).n;
 
-eq(s.ledgerCount, 10, '기간 내 건수는 10건 (7월 건 제외)');
+eq(s.ledgerCount, 13, '기간 내 건수는 13건 (7월 건 제외)');
 eq(n('map'), 1, '매핑 누락 1건');
 eq(n('appr'), 1, '승인 기록 누락 1건');
 eq(n('sod'), 1, '직무 분리 위반 1건');
@@ -130,9 +179,13 @@ eq(n('inputerr'), 1, '입력 오류 1건');
 eq(n('idc'), 0, 'ID 정합성 불일치 0건');
 eq(n('hold'), 1, '보완필요는 기간 밖도 집계 (전체 누적)');
 eq(n('exc'), 1, '예외 승인 1건');
-eq(n('fail'), 1, '실패(반려) 1건');
+eq(n('fail'), 1, '이전 표기 「실패(반려)」도 실패로 집계');
+eq(n('vfy'), 1, '검증 완료일 미비 1건');
+eq(n('verd'), 1, 'QA 판정 부적정 1건');
+eq(n('reqm'), 1, '요구사항 미확인 1건');
+eq(n('hold_issue'), 1, '보류 잔존 1건');
 eq(n('cond'), 0, '조건부 통과 0건');
-eq(s.defects, 8, '지적 항목 8종');
+eq(s.defects, 11, '지적 항목 11종');
 
 /* 정합성 미이행 건은 입력 오류로 중복 집계되지 않아야 합니다. */
 const onlyInputErr = computeSummary(
@@ -150,7 +203,7 @@ eq(missingFixes(cleanPeriod), [], '지적이 없으면 조치 내용도 필요 �
 /* 조치 내용 누락 검사 */
 const withFix = computeSummary(all, '2026-08-01', '2026-08-31', { map: '누락 건 ID 부여 완료' });
 eq(missingFixes(withFix).includes('증적 매핑 누락'), false, '조치 내용을 넣은 항목은 제외');
-eq(missingFixes(withFix).length, 7, '나머지 지적 항목 7종은 조치 내용 필요');
+eq(missingFixes(withFix).length, 10, '나머지 지적 항목 10종은 조치 내용 필요');
 
 /* 빈 대장 */
 const empty = computeSummary([], '2026-08-01', '2026-08-31');

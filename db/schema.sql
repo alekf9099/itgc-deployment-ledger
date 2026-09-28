@@ -61,6 +61,21 @@ CREATE TABLE IF NOT EXISTS entries (
   deleted_at      TIMESTAMPTZ                   -- NULL 이 아니면 대장에서 제외된 건
 );
 
+-- QA 완료 보고서 V2 대응 항목.
+-- 이미 운영 중인 표라 기존 열 사이에 끼우지 않고 뒤에 붙입니다.
+ALTER TABLE entries ADD COLUMN IF NOT EXISTS release_name   TEXT;   -- 릴리즈명
+ALTER TABLE entries ADD COLUMN IF NOT EXISTS planned_on     DATE;   -- 릴리즈 계획일
+ALTER TABLE entries ADD COLUMN IF NOT EXISTS verified_on    DATE;   -- 검증 완료일 (증적 문서 ID 기준일)
+ALTER TABLE entries ADD COLUMN IF NOT EXISTS qa_judged_by   TEXT;   -- QA 판정자
+ALTER TABLE entries ADD COLUMN IF NOT EXISTS qa_judged_on   DATE;   -- QA 판정일
+ALTER TABLE entries ADD COLUMN IF NOT EXISTS req_match      TEXT;   -- 일치 / 일치(범위 조정) / 불일치
+ALTER TABLE entries ADD COLUMN IF NOT EXISTS req_checked_by TEXT;   -- 요구사항 확인자
+ALTER TABLE entries ADD COLUMN IF NOT EXISTS hold_critical  INTEGER; -- 보류 이슈 (즉시·긴급)
+ALTER TABLE entries ADD COLUMN IF NOT EXISTS hold_high      INTEGER; -- 보류 이슈 (높음)
+
+COMMENT ON COLUMN entries.verified_on IS
+  '최종 회차 검증 완료일. 증적 문서 ID 의 날짜부는 이 값을 따릅니다 (QA 완료 보고서 V2).';
+
 CREATE INDEX IF NOT EXISTS entries_deploy_date_idx ON entries (deploy_date DESC);
 CREATE INDEX IF NOT EXISTS entries_active_idx      ON entries (deleted_at) WHERE deleted_at IS NULL;
 
