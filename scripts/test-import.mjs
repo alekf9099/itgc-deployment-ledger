@@ -8,7 +8,7 @@
  * 고칠 수 있게 되므로, 매핑을 검사로 고정합니다.
  */
 import { IMPORT_MAP, rowToEntry, serialToDate, importRange } from '../lib/sheet.js';
-import { validateEntry, FIELD_LABEL, ENUMS } from '../lib/entry.js';
+import { validateEntry, FIELD_LABEL, ENUMS, toClient } from '../lib/entry.js';
 
 let pass = 0;
 const fails = [];
@@ -105,6 +105,14 @@ eq(FIELD_LABEL.date, '배포일', '라벨 확인');
 /* ── 범위 ── */
 eq(importRange(), `'배포관리대장'!A6:AN1000`, '반입 범위는 데이터 영역');
 eq(importRange(20), `'배포관리대장'!A6:AN20`, '범위 상한 지정');
+
+/* ── DB → 화면 ── */
+/* 보류 건수는 INTEGER 라 숫자로 옵니다. 숫자 0 이 화면에서 공란이 되면
+   다시 저장할 때 0 → 공란 으로 바뀌고 그 변경이 이력에 남습니다. */
+const fromDb = toClient({ k: 'x', hold_critical: 0, hold_high: 3, doc_id: 'QA-20260820-01', memo: null });
+eq(fromDb.holdc, '0', '보류 건수 0 은 문자열 "0" 으로 (공란 아님)');
+eq(fromDb.holdh, '3', '보류 건수는 문자열로');
+eq(fromDb.memo, '', 'NULL 은 공란');
 
 if (fails.length) {
   console.error(`시트 반입 검증 실패 — ${pass}건 통과, ${fails.length}건 실패\n`);
