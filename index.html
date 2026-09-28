@@ -1254,8 +1254,13 @@ function fillRound(src){
   for(const k in CFORM) $(CFORM[k]).value=src?(src[k]??''):'';
   if(src?.fixes) for(const key in src.fixes) CHK[key]=src.fixes[key];
   if(src?.items) src.items.forEach(it=>{ if(it.fix) CHK[it.key]=it.fix; });
-  /* 새로 시작하는 회차는 점검자를 로그인 계정으로 채워 둡니다. */
-  if(!src&&!readonly()&&ME) $('cBy').value=ME.name;
+  /* 새로 시작하는 회차는 점검자를 로그인 계정으로, 점검 수행일을 오늘로 채워 둡니다.
+     수행일을 비워 두면 새 달을 열 때마다 지워져 확정이 「점검 수행일 미입력」으로
+     거부됩니다. */
+  if(!src&&!readonly()){
+    if(ME) $('cBy').value=ME.name;
+    $('cDate').value=fmt(new Date());
+  }
 }
 
 /** 화면의 현재 입력값 */
