@@ -58,6 +58,32 @@ for (const m of scripts.join('\n').matchAll(/'(f_[a-z]+)'/g)) referenced.add(m[1
 const missing = [...referenced].filter((id) => !declared.has(id)).sort();
 if (missing.length) fail.push(`코드가 참조하는 id가 마크업에 없습니다: ${missing.join(', ')}`);
 
+/* 3-2. 호출하는 함수가 정의되어 있는지
+   문법 검사는 정의되지 않은 함수 호출을 잡지 못합니다. v2.10.0 에서
+   saveCheck·queueDraft 가 지워진 채 배포되어, 월간 점검 확정 버튼이
+   누를 때 오류로 멈추는 상태가 다섯 버전 동안 남아 있었습니다. */
+const code = scripts.join('\n')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/\/\/[^\n]*/g, '')
+  .replace(/`(?:\\.|[^`\\])*`|'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"/g, '""');
+const defined = new Set([
+  ...[...code.matchAll(/\b(?:function|class)\s+([A-Za-z_$][\w$]*)/g)].map((m) => m[1]),
+  ...[...code.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=/g)].map((m) => m[1]),
+  ...[...code.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*(?:\s*=[^,;]*)?(?:\s*,\s*[A-Za-z_$][\w$]*(?:\s*=[^,;]*)?)+)/g)]
+    .flatMap((m) => m[1].split(',').map((p) => p.trim().split(/\s|=/)[0])),
+]);
+const GLOBAL = new Set(['if', 'for', 'while', 'switch', 'catch', 'return', 'typeof', 'function',
+  'fetch', 'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'confirm', 'alert', 'prompt',
+  'encodeURIComponent', 'decodeURIComponent', 'parseInt', 'parseFloat', 'isNaN', 'String', 'Number',
+  'Boolean', 'Array', 'Object', 'Date', 'Math', 'JSON', 'Promise', 'Error', 'Set', 'Map', 'RegExp',
+  'URL', 'URLSearchParams', 'Blob', 'requestAnimationFrame', 'structuredClone', 'await', 'super',
+  'async', 'constructor']);
+/* 선언 없이 쓰는 매개변수·지역 화살표 함수는 소문자 한 단어가 많아, 정의
+   집합에 없는 이름만 추려 사람이 읽을 수 있을 만큼 좁힙니다. */
+const called = new Set([...code.matchAll(/(?<![\w$.])([A-Za-z_$][\w$]*)\s*\(/g)].map((m) => m[1]));
+const undef = [...called].filter((n) => !defined.has(n) && !GLOBAL.has(n) && n.length > 2).sort();
+if (undef.length) fail.push(`정의되지 않은 함수를 호출합니다: ${undef.join(', ')}`);
+
 /* 4. 버전 표기 */
 const v = html.match(/const APP_VERSION\s*=\s*'([^']+)'/);
 if (!v) fail.push("APP_VERSION 상수를 찾지 못했습니다");
