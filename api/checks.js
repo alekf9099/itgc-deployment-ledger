@@ -149,7 +149,9 @@ export default async function handler(req, res) {
               SET data = EXCLUDED.data,
                   updated_by = EXCLUDED.updated_by,
                   updated_at = now()`,
-      [from, to, JSON.stringify(draftOf(req.body?.draft))]
+      /* v2.9.0 부터 $4(작성자) 값이 빠져 있어 모든 초안 저장이 500 으로
+         실패했습니다. 화면에서 부르는 코드도 v2.10.0 에 지워져 드러나지 않았습니다. */
+      [from, to, JSON.stringify(draftOf(req.body?.draft)), user.username]
     );
     return res.status(200).json({ ok: true });
   }
