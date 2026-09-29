@@ -8,7 +8,7 @@
  * 고칠 수 있게 되므로, 매핑을 검사로 고정합니다.
  */
 import { IMPORT_MAP, rowToEntry, serialToDate, importRange } from '../lib/sheet.js';
-import { validateEntry, FIELD_LABEL, ENUMS, toClient } from '../lib/entry.js';
+import { validateEntry, FIELD_LABEL, ENUMS, toClient, toRow, findIdOverlap, FIELDS } from '../lib/entry.js';
 
 let pass = 0;
 const fails = [];
@@ -113,6 +113,17 @@ const fromDb = toClient({ k: 'x', hold_critical: 0, hold_high: 3, doc_id: 'QA-20
 eq(fromDb.holdc, '0', '보류 건수 0 은 문자열 "0" 으로 (공란 아님)');
 eq(fromDb.holdh, '3', '보류 건수는 문자열로');
 eq(fromDb.memo, '', 'NULL 은 공란');
+
+/* ── 여러 ID: 정규화 · 겹침 ── */
+const idIdx = FIELDS.findIndex(([k]) => k === 'id');
+eq(toRow({ id: 'QA-20260929-01,QA-20260929-02' })[idIdx], 'QA-20260929-01, QA-20260929-02', '저장 전 ID 목록 정규화');
+eq(validateEntry({ id: 'QA-20260929-01, QA-20260929-01' }).some((m) => /두 번/.test(m)), true, '같은 ID 두 번은 저장 거부');
+const others = [{ k: 'a', doc_id: 'QA-20260928-01, QA-20260929-01' }, { k: 'b', doc_id: 'QA-20260929-05' }];
+eq(findIdOverlap(others, ['QA-20260929-02', 'QA-20260929-01'])?.k, 'a', '일부만 겹쳐도 찾아냄');
+eq(findIdOverlap(others, ['QA-20260929-02']), null, '겹치지 않으면 null');
+const rowIds = Array(40).fill('');
+rowIds[1] = 'QA-20260929-01 ,QA-20260929-02';
+eq(rowToEntry(rowIds).id, 'QA-20260929-01, QA-20260929-02', '시트에서 가져온 ID 목록도 같은 형식으로');
 
 if (fails.length) {
   console.error(`시트 반입 검증 실패 — ${pass}건 통과, ${fails.length}건 실패\n`);

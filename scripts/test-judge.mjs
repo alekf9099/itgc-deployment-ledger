@@ -6,7 +6,7 @@
  * 판정 규칙과 점검 집계는 통제 결과를 결정하는 부분입니다. DB 나 로그인이
  * 없어도 확인할 수 있어야 하므로 순수 함수만 검사합니다.
  */
-import { deadline, judge, computeSummary, missingFixes, CHECK_DEFS } from '../lib/judge.js';
+import { deadline, judge, computeSummary, missingFixes, CHECK_DEFS, splitDocIds, normalizeDocIds, splitNames } from '../lib/judge.js';
 
 let pass = 0;
 const fails = [];
@@ -132,6 +132,34 @@ eq(judge({ ...clean, req: '일치', reqby: '' }).reqm, 'bad', '확인자 미기�
 eq(judge({ ...clean, req: '불일치', qav: '통과' }).reqm, 'bad', '불일치인데 통과 판정은 미확인');
 eq(judge({ ...clean, req: '불일치', qav: '조건부 통과' }).reqm, 'ok', '불일치 + 조건부 통과는 정상');
 eq(judge({ ...clean, date: '' }).reqm, null, '배포일 없으면 미판정');
+
+/* ── 여러 증적 문서 ID (릴리즈 1건 = 보고서 여러 개) ── */
+eq(splitDocIds('QA-20260928-01, QA-20260929-01,QA-20260929-02\nQA-20260929-03'),
+  ['QA-20260928-01', 'QA-20260929-01', 'QA-20260929-02', 'QA-20260929-03'], '쉼표·공백·줄바꿈 구분 모두 인식');
+eq(normalizeDocIds(' QA-20260929-01 ,QA-20260929-02 '), 'QA-20260929-01, QA-20260929-02', '저장 형식으로 정규화');
+eq(splitDocIds(''), [], '빈 값은 빈 목록');
+
+const rel = { ...clean, date: '2026-09-30', vdate: '2026-09-29', type: '정규' };
+eq(judge({ ...rel, id: 'QA-20260928-01, QA-20260929-01, QA-20260929-02, QA-20260929-03' }).idc, 'ok',
+  '실제 사례: 09-28 1건 + 09-29 3건, 검증 완료일 09-29 → 정상');
+eq(judge({ ...rel, id: 'QA-20260928-01, QA-20260928-02' }).idc, 'bad',
+  '검증 완료일(09-29)과 같은 날짜의 ID 가 없으면 불일치');
+eq(judge({ ...rel, id: 'QA-20260929-01, QA-20260930-01' }).idc, 'bad',
+  '검증 완료일 이후 날짜의 ID 가 있으면 불일치');
+eq(judge({ ...rel, id: 'QA-20260929-01, QA-20260929-01' }).idc, 'bad', '같은 ID 반복은 불일치');
+eq(judge({ ...rel, id: 'QA-20260929-01, QA-2026929-02' }).idc, 'bad', '하나라도 형식 위반이면 불일치');
+eq(judge({ ...rel, id: 'QA-20260929-01' }).idc, 'ok', 'ID 하나는 기존 규칙과 같음');
+eq(judge({ ...rel, id: 'QA-20260928-01' }).idc, 'bad', 'ID 하나인데 날짜가 다르면 불일치 (기존과 같음)');
+eq(judge({ ...rel, type: '정규', id: 'QA-A-20260929-01, QA-20260929-02' }).idc, 'bad',
+  '구 형식이 섞이면 유형코드도 검사');
+
+/* ── 직무 분리: 여러 명 ── */
+eq(splitNames('이개발, 박개발 ,김개발'), ['이개발', '박개발', '김개발'], '성명 목록 분리');
+eq(judge({ ...clean, dev: '이개발, 박개발', qa: '박개발' }).sod, 'bad', '한 사람이라도 겹치면 위반');
+eq(judge({ ...clean, dev: '이개발, 박개발', qa: '최우석, 김홍현' }).sod, 'ok', '겹치는 사람이 없으면 정상');
+eq(judge({ ...clean, dev: '이개발', qa: '최우석, 이개발' }).sod, 'bad', '검증 수행자 쪽이 여러 명이어도 겹침 확인');
+eq(judge({ ...clean, dev: '개발 22명 · 배포 PR #123', qa: '최우석, 김홍현' }).sod, 'ok',
+  '정규 표기(개발 N명 · 배포 PR) 는 겹침 없음 — 확인 결과는 비고에 남김');
 
 /* ── 월간 점검 집계 ── */
 /* 날짜를 바꿀 때 ID 와 등록일도 함께 맞춥니다. 그러지 않으면 검사하려는
