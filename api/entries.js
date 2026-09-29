@@ -7,9 +7,10 @@
  *
  * 판정 결과는 저장하지 않습니다. 화면이 입력값에서 계산합니다.
  */
-import { query, one } from '../lib/db.js';
+import { query, one, tx } from '../lib/db.js';
 import { requireUser, audit, sameOrigin } from '../lib/auth.js';
-import { COLS, toRow, toClient, diff, validateEntry } from '../lib/entry.js';
+import { COLS, toRow, toClient, diff, validateEntry, findIdOverlap } from '../lib/entry.js';
+import { splitDocIds } from '../lib/judge.js';
 
 /* 증적 문서 ID 유니크 인덱스 위반 */
 const UNIQUE_VIOLATION = '23505';
@@ -95,17 +96,41 @@ export default async function handler(req, res) {
 
     let rows;
     try {
-      ({ rows } = await query(
-        `INSERT INTO entries (k, ${COLS.join(', ')}, created_by, created_at)
-              VALUES ($1, ${insertCols}, $${COLS.length + 2}, now())
-         ON CONFLICT (k) DO UPDATE
-                SET ${setList},
-                    updated_by = $${COLS.length + 2},
-                    updated_at = now()
-           RETURNING k, ${COLS.join(', ')}, created_by, created_at, updated_by, updated_at`,
-        [k, ...values, user.name]
-      ));
+      rows = await tx(async (c) => {
+        /* ID 겹침 검사와 저장 사이에 다른 저장이 끼어들면 둘 다 통과할 수 있어,
+           대장 저장을 한 줄로 세웁니다. 저장 빈도가 낮아 대기는 거의 없습니다. */
+        await c.query('SELECT pg_advisory_xact_lock(4217001)');
+
+        const ids = splitDocIds(body.id);
+        if (ids.length) {
+          const { rows: others } = await c.query(
+            `SELECT k, doc_id FROM entries
+              WHERE deleted_at IS NULL AND doc_id IS NOT NULL AND k <> $1`,
+            [k]
+          );
+          const hit = findIdOverlap(others, ids);
+          if (hit) throw Object.assign(new Error('overlap'), { overlap: hit });
+        }
+
+        const r = await c.query(
+          `INSERT INTO entries (k, ${COLS.join(', ')}, created_by, created_at)
+                VALUES ($1, ${insertCols}, $${COLS.length + 2}, now())
+           ON CONFLICT (k) DO UPDATE
+                  SET ${setList},
+                      updated_by = $${COLS.length + 2},
+                      updated_at = now()
+             RETURNING k, ${COLS.join(', ')}, created_by, created_at, updated_by, updated_at`,
+          [k, ...values, user.name]
+        );
+        return r.rows;
+      });
     } catch (e) {
+      /* 보고서 하나가 두 배포 건에 걸리면 모집단과 증적의 1:1 대응이 깨집니다. */
+      if (e.overlap) {
+        return res.status(409).json({
+          error: `증적 문서 ID ${e.overlap.id} 는 이미 다른 배포 건(${e.overlap.docId})에 등록되어 있습니다.`,
+        });
+      }
       /* 증적 문서 ID 중복. 화면이 일련번호를 자기 목록에서 계산하므로,
          두 담당자가 동시에 등록하면 같은 값이 만들어질 수 있습니다. */
       if (e.code === UNIQUE_VIOLATION) {

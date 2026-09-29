@@ -18,7 +18,8 @@
  */
 import { query, one } from '../lib/db.js';
 import { requireUser, audit, sameOrigin } from '../lib/auth.js';
-import { COLS, FIELDS, FIELD_LABEL, toRow, toClient, diff, validateEntry } from '../lib/entry.js';
+import { COLS, FIELDS, FIELD_LABEL, toRow, toClient, diff, validateEntry, findIdOverlap } from '../lib/entry.js';
+import { splitDocIds } from '../lib/judge.js';
 import { LEDGER_SHEET, LEDGER_HEADER, LEDGER_HEADER_ROW, colName, rowToEntry, importRange } from '../lib/sheet.js';
 import { sheetConfig, readRange } from '../lib/google.js';
 
@@ -72,11 +73,21 @@ async function buildPlan() {
 
     const bad = validateEntry(e);
 
-    /* 시트 안에서 ID 가 중복되면 어느 쪽이 맞는지 알 수 없습니다. */
-    if (e.id && seen.has(e.id)) {
-      bad.push(`시트 ${seen.get(e.id)}행과 증적 문서 ID 중복`);
-    } else if (e.id) {
-      seen.set(e.id, line);
+    /* 시트 안에서 ID 가 겹치면 어느 쪽이 맞는지 알 수 없습니다.
+       한 행에 ID 가 여러 개일 수 있으므로 ID 하나하나로 봅니다. */
+    const ids = splitDocIds(e.id);
+    const dup = ids.find((x) => seen.has(x));
+    if (dup) bad.push(`시트 ${seen.get(dup)}행과 증적 문서 ID ${dup} 겹침`);
+    else ids.forEach((x) => seen.set(x, line));
+
+    const cur = existing.get(e.id);
+
+    /* 대장의 다른 건과 ID 가 일부만 겹치면, 같은 배포 건인지 다른 건인지
+       기계적으로 정할 수 없어 사람이 확인하도록 제외합니다. */
+    if (!dup && !bad.length) {
+      const others = [...existing.values()].filter((o) => o !== cur).map((o) => ({ k: o.k, doc_id: o.id }));
+      const hit = findIdOverlap(others, ids);
+      if (hit) bad.push(`증적 문서 ID ${hit.id} 가 대장의 다른 건(${hit.docId})에 이미 있음`);
     }
 
     if (bad.length) {
@@ -84,7 +95,6 @@ async function buildPlan() {
       return;
     }
 
-    const cur = existing.get(e.id);
     if (!cur) {
       add.push({ line, entry: e });
       return;
