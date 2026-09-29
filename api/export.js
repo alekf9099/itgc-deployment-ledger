@@ -17,6 +17,7 @@ import { COLS, toClient } from '../lib/entry.js';
 import { judge } from '../lib/judge.js';
 import { LEDGER_HEADER, buildLedgerRows } from '../lib/sheet.js';
 import { toCsv, sha256 } from '../lib/csv.js';
+import { checkRows } from '../lib/check-export.js';
 
 /** 화면 필터와 같은 조건. 어떤 범위를 반출했는지 기록에 남기기 위해 문구도 만듭니다. */
 function applyFilters(entries, f) {
@@ -46,57 +47,6 @@ function applyFilters(entries, f) {
     parts.push(`검색 "${f.q}"`);
   }
   return { rows: out, scope: parts.length ? parts.join(' · ') : '전체 (필터 없음)' };
-}
-
-function checkRows(c) {
-  const items = c.items ?? [];
-  const pop = c.pop_count;
-  const match =
-    pop === null || pop === undefined
-      ? '미입력'
-      : Number(pop) === Number(c.ledger_count)
-        ? '일치'
-        : `불일치 (차이 ${Math.abs(Number(pop) - Number(c.ledger_count))}건)`;
-
-  const R = [];
-  R.push(['월간 점검 기록']);
-  R.push(['점검 대상 통제', 'PC-01 애플리케이션 변경 승인 및 개발자/사용자 테스트 · PD-02 데이터 정합성 테스트']);
-  R.push(['점검 근거', '릴리즈 유형별 QA/QC 증적 수립 표준 가이드라인 5항']);
-  R.push(['점검 주체', 'QA유닛 (통제부서)']);
-  R.push(['점검 방법', '대장 전수 검토 및 배포 이력(GitHub RELEASE 머지 PR 목록) 대조']);
-  R.push(['점검 대상 기간 (배포일 기준)', `${c.period_from} ~ ${c.period_to}`]);
-  R.push(['점검 수행일', c.performed_on]);
-  R.push(['점검자', c.performed_by]);
-  R.push(['확인자', c.approved_by]);
-  R.push([]);
-  R.push(['1. 모집단 완전성 확인']);
-  R.push(['구분', '건수']);
-  R.push(['배포 이력 건수 (GitHub RELEASE 머지 PR)', pop ?? '']);
-  R.push(['대장 기재 건수', c.ledger_count]);
-  R.push(['일치 여부', match]);
-  R.push(['차이 원인 및 조치', c.pop_note ?? '']);
-  R.push([]);
-  R.push(['2. 점검 항목별 결과']);
-  R.push(['구분', '점검 항목', '관련 통제', '건수', '판단 기준', '조치 내용']);
-  items.forEach((it) =>
-    R.push([it.isDef ? '지적 항목' : '확인 항목', it.name, it.ctrl, it.n, it.crit, it.fix ?? ''])
-  );
-  R.push([]);
-  R.push(['3. 표본 재검토', c.sample ?? '']);
-  R.push([]);
-  R.push(['4. 점검 결과']);
-  R.push(['모집단 건수', c.ledger_count]);
-  R.push(['확인필요 건수', c.flagged]);
-  R.push(['지적 항목 수', c.defects]);
-  R.push(['점검 결과', c.defects ? '보완 필요' : '적정 (지적사항 없음)']);
-  R.push(['점검자 의견', c.opinion ?? '']);
-  R.push([]);
-  R.push(['구분', '성명', '일자']);
-  R.push(['점검자 (QA유닛)', c.performed_by, c.performed_on]);
-  R.push(['확인자 (QA유닛 책임자)', c.approved_by, '']);
-  R.push([]);
-  R.push(['※ 본 점검은 통제부서(QA유닛)의 자체 점검이며, 통제검토부서(TA유닛)의 검토와는 별개의 절차이다.']);
-  return R;
 }
 
 export default async function handler(req, res) {
@@ -151,7 +101,14 @@ export default async function handler(req, res) {
       const c = await one(`SELECT * FROM checks WHERE id = $1 AND deleted_at IS NULL`, [id]);
       if (!c) return res.status(404).json({ error: '해당 점검 이력을 찾을 수 없습니다.' });
 
-      rows = checkRows(c);
+      /* 같은 회차에서 제외 표시된 이전 확정 기록 수(재작성·삭제). 반출본만 보고도 재작성본인지
+         알 수 있어야 합니다. */
+      const prev = await one(
+        `SELECT count(*)::int AS n FROM checks
+          WHERE period_from = $1 AND period_to = $2 AND deleted_at IS NOT NULL`,
+        [c.period_from, c.period_to]
+      );
+      rows = checkRows(c, prev?.n ?? 0);
       count = c.ledger_count ?? 0;
       action = 'export.check';
       note = `월간 점검 · ${c.period_from}~${c.period_to} · 모집단 ${count}건 · 지적 ${c.defects}건`;

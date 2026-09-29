@@ -18,7 +18,7 @@
 import { query, one } from '../lib/db.js';
 import { requireUser, audit, sameOrigin } from '../lib/auth.js';
 import { COLS, toClient } from '../lib/entry.js';
-import { CHECK_DEFS, computeSummary, missingFixes } from '../lib/judge.js';
+import { CHECK_DEFS, computeSummary, missingFixes, storedItems } from '../lib/judge.js';
 
 const PERIOD_CONFLICT = '23505';
 
@@ -230,7 +230,9 @@ export default async function handler(req, res) {
           b.opinion ?? '',
           summary.flagged,
           summary.defects,
-          JSON.stringify(summary.items),
+          /* 화면 구분선은 점검 항목이 아니므로 저장하지 않습니다. 저장하면 반출본에
+             이름 없는 「확인 항목」이 한 줄 생기고 화면에는 구분선이 두 번 나옵니다. */
+          JSON.stringify(storedItems(summary.items)),
           user.name,
         ]
       ));
