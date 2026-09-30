@@ -39,7 +39,8 @@ function applyFilters(entries, f) {
   if (f.q) {
     const q = f.q.toLowerCase();
     out = out.filter((r) =>
-      [r.id, r.sys, r.task, r.dev, r.qa, r.appr, r.judge]
+      /* 화면 검색과 같은 항목. 다르면 화면에서 본 목록과 반출본이 달라집니다. */
+      [r.id, r.sys, r.task, r.dev, r.qa, r.appr, r.judge, r.memo]
         .join(' ')
         .toLowerCase()
         .includes(q)

@@ -107,6 +107,9 @@ tbody tr:hover{background:#F8FAFC}
 tbody tr.flag{background:#FDF4F5}
 tbody tr.flag:hover{background:#FBEDEF}
 td.id,td.num,td.d{font-family:var(--mono);font-size:11.5px;font-variant-numeric:tabular-nums}
+/* 비고는 길어질 수 있어 두 줄까지만 보이고, 마우스를 올리면 전체가 보입니다. */
+td.memo{min-width:160px;max-width:260px;font-size:11.5px;color:var(--ink-2)}
+td.memo>div{white-space:pre-line;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 td.act{text-align:right}
 td.act button{background:none;border:0;color:var(--ink-3);cursor:pointer;padding:2px 5px;border-radius:4px;font-size:11.5px}
 td.act button:hover{background:var(--line-2);color:var(--ink)}
@@ -372,7 +375,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
     <div class="grid" id="stats"></div>
 
     <div class="bar">
-      <input type="text" id="q" placeholder="ID · 시스템 · 담당자 검색" style="width:230px">
+      <input type="text" id="q" placeholder="ID · 시스템 · 담당자 · 비고 검색" style="width:250px">
       <select id="fType"><option value="">유형 전체</option><option>정규</option><option>수시</option><option>핫픽스</option></select>
       <select id="fVerdict"><option value="">판정 전체</option><option>확인필요</option><option>정상</option></select>
       <input type="date" id="fFrom" title="배포일 시작"><input type="date" id="fTo" title="배포일 종료">
@@ -388,7 +391,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
         <thead><tr>
           <th>판정</th><th>증적 문서 ID</th><th>배포일</th><th>검증 완료일</th><th>유형</th><th>대상 시스템</th>
           <th>일감 / 릴리즈</th><th>변경 작성자</th><th>검증 수행자</th><th>QA 판정</th>
-          <th>승인자</th><th>등록일</th><th>기한</th><th>상태</th><th></th>
+          <th>승인자</th><th>등록일</th><th>기한</th><th>상태</th><th>비고</th><th></th>
         </tr></thead>
         <tbody id="rows"></tbody>
       </table>
@@ -943,7 +946,7 @@ const skLines=(n,base=240)=>`<div class="skline">${
   Array.from({length:n},(_,i)=>sk(Math.max(90,base-i*38))).join('')}</div>`;
 
 /* 표 열 폭에 맞춘 스켈레톤 폭. 실제 값과 비슷한 길이로 두어 로딩 후 흔들림을 줄입니다. */
-const SK_LEDGER=[86,86,62,62,38,104,78,48,48,54,48,62,62,50,26];
+const SK_LEDGER=[86,86,62,62,38,104,78,48,48,54,48,62,62,50,150,26];
 const SK_LOG=[104,64,62,116,180];
 const SK_USERS=[138,58,58,86,44,96,74,112];
 const SK_TABLES=[120,60,58,150];
@@ -966,7 +969,8 @@ function filtered(){
     if(to&&(!r.date||r.date>to)) return false;
     if(vd&&judge(r).overall!==vd) return false;
     if(q){
-      const hay=[r.id,r.sys,r.task,r.dev,r.qa,r.appr,r.judge].join(' ').toLowerCase();
+      /* 비고에는 미포함 프로젝트 · 사후 검증 사유 · 보완 요청 같은 확인 사항이 적혀 있어 함께 찾습니다. */
+      const hay=[r.id,r.sys,r.task,r.dev,r.qa,r.appr,r.judge,r.memo].join(' ').toLowerCase();
       if(!hay.includes(q)) return false;
     }
     return true;
@@ -978,7 +982,7 @@ const PT={'통과':'p-ok','조건부 통과':'p-cond','실패':'p-fail','실패(
 function renderLedger(){
   const list=filtered(), tb=$('rows');
   if(!list.length){
-    tb.innerHTML=`<tr><td colspan="15"><div class="empty"><b>표시할 배포 건이 없습니다</b>배포 건을 추가하거나 필터를 초기화하십시오.</div></td></tr>`;
+    tb.innerHTML=`<tr><td colspan="16"><div class="empty"><b>표시할 배포 건이 없습니다</b>배포 건을 추가하거나 필터를 초기화하십시오.</div></td></tr>`;
   } else {
     tb.innerHTML=list.map(r=>{
       const v=judge(r);
@@ -993,6 +997,7 @@ function renderLedger(){
         <td>${r.qav?`<span class="tag ${PT[r.qav]||''}">${esc(r.qav)}</span>`:''}</td>
         <td>${esc(r.appr)}</td><td class="d">${esc(r.reg)}</td>
         <td class="d">${fmt(v.deadline)}</td><td>${esc(r.state)}</td>
+        <td class="memo"${r.memo?` title="${esc(r.memo)}"`:''}><div>${esc(r.memo)}</div></td>
         <td class="act"><button data-edit="${r.k}">편집</button></td>
       </tr>`;
     }).join('');
