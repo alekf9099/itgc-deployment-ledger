@@ -797,7 +797,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.20.2';
+const APP_VERSION='2.20.3';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -986,6 +986,13 @@ const PT={'통과':'p-ok','조건부 통과':'p-cond','실패':'p-fail','실패(
    정규 릴리즈는 개발자가 여러 명이라 이름을 다 보이면 한 행이 몇 줄로 늘어납니다.
    목록에서는 앞의 두 명과 「외 N명」만 보이고, 마우스를 올리면 전체가 보입니다.
    편집 화면·반출본·판정은 전체 명단을 그대로 씁니다. */
+/* 증적 문서 ID 칸. 릴리즈에 보고서가 여러 개면 한 줄에 하나씩 쌓여 행이 길어지므로,
+   첫 ID 와 「외 N건」만 보이고 마우스를 올리면 전체가 보입니다. 검색은 전체 ID 로 합니다. */
+function idsCell(s){
+  const ids=splitDocIds(s);
+  if(ids.length<=1) return esc(ids[0]||'');
+  return `<span class="names" title="${esc(ids.join(', '))}">${esc(ids[0])} <b>외 ${ids.length-1}건</b></span>`;
+}
 function namesCell(s,max=2){
   const ns=splitNames(s);
   if(ns.length<=max) return esc(s);
@@ -1000,7 +1007,7 @@ function renderLedger(){
       const v=judge(r);
       return `<tr class="${v.flag?'flag':''}" data-k="${r.k}">
         <td><span class="strip">${stripHTML(v)}</span></td>
-        <td class="id">${r.id?splitDocIds(r.id).map(esc).join('<br>'):'<span style="color:var(--bad)">미부여</span>'}</td>
+        <td class="id">${r.id?idsCell(r.id):'<span style="color:var(--bad)">미부여</span>'}</td>
         <td class="d">${esc(r.date)}</td>
         <td class="d">${esc(r.vdate)}</td>
         <td><span class="tag t-${CODE[r.type]||''}">${esc(r.type)}</span></td>
