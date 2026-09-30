@@ -110,6 +110,8 @@ td.id,td.num,td.d{font-family:var(--mono);font-size:11.5px;font-variant-numeric:
 /* 비고는 길어질 수 있어 두 줄까지만 보이고, 마우스를 올리면 전체가 보입니다. */
 td.memo{min-width:160px;max-width:260px;font-size:11.5px;color:var(--ink-2)}
 td.memo>div{white-space:pre-line;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+td .names{white-space:nowrap;cursor:help}
+td .names b{font-weight:600;color:var(--ink-3)}
 td.act{text-align:right}
 td.act button{background:none;border:0;color:var(--ink-3);cursor:pointer;padding:2px 5px;border-radius:4px;font-size:11.5px}
 td.act button:hover{background:var(--line-2);color:var(--ink)}
@@ -795,7 +797,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.20.1';
+const APP_VERSION='2.20.2';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -980,6 +982,15 @@ function filtered(){
 /* 「실패(반려)」는 이전 표기입니다. 이미 저장된 값도 같게 보이도록 함께 둡니다. */
 const PT={'통과':'p-ok','조건부 통과':'p-cond','실패':'p-fail','실패(반려)':'p-fail'};
 
+/* 담당자 목록 칸
+   정규 릴리즈는 개발자가 여러 명이라 이름을 다 보이면 한 행이 몇 줄로 늘어납니다.
+   목록에서는 앞의 두 명과 「외 N명」만 보이고, 마우스를 올리면 전체가 보입니다.
+   편집 화면·반출본·판정은 전체 명단을 그대로 씁니다. */
+function namesCell(s,max=2){
+  const ns=splitNames(s);
+  if(ns.length<=max) return esc(s);
+  return `<span class="names" title="${esc(ns.join(', '))}">${esc(ns.slice(0,max).join(', '))} <b>외 ${ns.length-max}명</b></span>`;
+}
 function renderLedger(){
   const list=filtered(), tb=$('rows');
   if(!list.length){
@@ -994,7 +1005,7 @@ function renderLedger(){
         <td class="d">${esc(r.vdate)}</td>
         <td><span class="tag t-${CODE[r.type]||''}">${esc(r.type)}</span></td>
         <td>${esc(r.sys)}</td><td>${esc(r.task)}</td>
-        <td>${esc(r.dev)}</td><td>${esc(r.qa)}</td>
+        <td>${namesCell(r.dev)}</td><td>${namesCell(r.qa)}</td>
         <td>${r.qav?`<span class="tag ${PT[r.qav]||''}">${esc(r.qav)}</span>`:''}</td>
         <td>${esc(r.appr)}</td><td class="d">${esc(r.reg)}</td>
         <td class="d">${fmt(v.deadline)}</td><td>${esc(r.state)}</td>
