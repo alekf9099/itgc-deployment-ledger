@@ -22,7 +22,7 @@ const eq = (a, b, label) => {
 const keys = IMPORT_MAP.map(([, k]) => k);
 eq(keys.includes('id'), true, '증적 문서 ID 를 가져옴');
 eq(keys.includes('memo'), true, '비고를 가져옴');
-eq(IMPORT_MAP.length, 28, '가져오는 항목은 28개');
+eq(IMPORT_MAP.length, 30, '가져오는 항목은 30개');
 
 /* 판정 열과 No 열은 계산 결과이므로 가져오지 않아야 합니다. */
 const idx = IMPORT_MAP.map(([i]) => i);
@@ -53,7 +53,7 @@ eq(e.type, '정규', '릴리즈 구분');
 eq(e.memo, '비고', '비고');
 eq(e.int, '', '빈 칸은 빈 문자열');
 eq('idc' in e, false, '판정 값은 결과에 들어오지 않음');
-eq(Object.keys(e).length, 28, '결과 항목 수는 매핑과 동일');
+eq(Object.keys(e).length, 30, '결과 항목 수는 매핑과 동일');
 
 eq(rowToEntry([]), null, '빈 행은 null');
 eq(rowToEntry(['', '', '']), null, '값이 전부 비면 null');
@@ -103,8 +103,8 @@ eq(ENUMS.state.length, 5, '증적 상태 허용값 5종');
 eq(FIELD_LABEL.date, '배포일', '라벨 확인');
 
 /* ── 범위 ── */
-eq(importRange(), `'배포관리대장'!A6:AN1000`, '반입 범위는 데이터 영역');
-eq(importRange(20), `'배포관리대장'!A6:AN20`, '범위 상한 지정');
+eq(importRange(), `'배포관리대장'!A6:AQ1000`, '반입 범위는 데이터 영역');
+eq(importRange(20), `'배포관리대장'!A6:AQ20`, '범위 상한 지정');
 
 /* ── DB → 화면 ── */
 /* 보류 건수는 INTEGER 라 숫자로 옵니다. 숫자 0 이 화면에서 공란이 되면

@@ -73,6 +73,10 @@ ALTER TABLE entries ADD COLUMN IF NOT EXISTS req_checked_by TEXT;   -- 요구사
 ALTER TABLE entries ADD COLUMN IF NOT EXISTS hold_critical  INTEGER; -- 보류 이슈 (즉시·긴급)
 ALTER TABLE entries ADD COLUMN IF NOT EXISTS hold_high      INTEGER; -- 보류 이슈 (높음)
 
+-- 배포 수행자 · 배포 승인 근거 (v2.20.0)
+ALTER TABLE entries ADD COLUMN IF NOT EXISTS deployed_by    TEXT;   -- 운영에 반영한 사람
+ALTER TABLE entries ADD COLUMN IF NOT EXISTS approval_ref   TEXT;   -- 릴리즈 결재 링크 또는 PR 주소
+
 COMMENT ON COLUMN entries.verified_on IS
   '최종 회차 검증 완료일. 증적 문서 ID 의 날짜부는 이 값을 따릅니다 (QA 완료 보고서 V2).';
 
