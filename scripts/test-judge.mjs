@@ -86,6 +86,7 @@ const clean = {
   /* 보고서 V2 대응 항목 */
   vdate: '2026-08-14', qav: '통과', qajudge: '박검증', qajd: '2026-08-14',
   req: '일치', reqby: '김동완', holdc: '', holdh: '', rel: '', plan: '', memo: '',
+  deployer: '김인프라',
 };
 eq(judge(clean).flag, false, '이상 없는 건은 확인필요 아님');
 eq(judge(clean).overall, '정상', '이상 없는 건의 종합 판정은 정상');
@@ -161,6 +162,28 @@ eq(judge({ ...clean, dev: '이개발', qa: '최우석, 이개발' }).sod, 'bad',
 eq(judge({ ...clean, dev: '개발 22명 · 배포 PR #123', qa: '최우석, 김홍현' }).sod, 'ok',
   '정규 표기(개발 N명 · 배포 PR) 는 겹침 없음 — 확인 결과는 비고에 남김');
 
+/* ── 배포 승인: 사후 승인 · 자기 승인 ── */
+const dep = { ...clean, date: '2026-09-30', type: '정규', appr: '김결재', apprd: '2026-09-30', dev: '이개발', deployer: '김인프라' };
+eq(judge(dep).appr, 'ok', '배포일 당일 승인은 완비');
+eq(judge({ ...dep, apprd: '2026-09-29' }).appr, 'ok', '배포 전 승인은 완비');
+eq(judge({ ...dep, apprd: '2026-10-01' }).appr, 'bad', '배포 후 승인은 미완비 (정규)');
+eq(judge({ ...dep, type: '수시', apprd: '2026-10-01' }).appr, 'bad', '배포 후 승인은 미완비 (수시)');
+eq(judge({ ...dep, type: '핫픽스', apprd: '2026-10-01', memo: '' }).appr, 'bad', '핫픽스 사후 승인도 사유가 없으면 미완비');
+eq(judge({ ...dep, type: '핫픽스', apprd: '2026-10-01', memo: '장애 긴급 조치 후 승인' }).appr, 'ok', '핫픽스 사후 승인 + 사유는 완비');
+eq(judge({ ...dep, appr: '이개발' }).appr, 'bad', '변경 작성자가 자기 배포를 승인하면 미완비');
+eq(judge({ ...dep, dev: '이개발, 박개발', appr: '박개발' }).appr, 'bad', '여러 개발자 중 한 명이 승인해도 미완비');
+
+/* ── 배포 수행자 ── */
+eq(judge(dep).dep, 'ok', '배포 수행자 기재');
+eq(judge({ ...dep, deployer: '' }).dep, 'bad', '배포 수행자 미기재');
+eq(judge({ ...dep, deployer: '이개발' }).dep, 'ok', '개발자 직접 배포 자체는 위반 아님');
+eq(judge({ ...dep, deployer: '이개발' }).appr, 'ok', '개발자가 배포해도 사전 승인이 있으면 승인 기록 완비');
+eq(judge({ ...dep, date: '' }).dep, null, '배포일 없으면 미판정');
+
+const dd = computeSummary([dep, { ...dep, id: 'QA-20260930-02', deployer: '이개발' }], '2026-09-01', '2026-09-30');
+eq(dd.items.find((i) => i.key === 'devdeploy').n, 1, '확인 항목: 개발자 직접 배포 1건');
+eq(dd.items.find((i) => i.key === 'devdeploy').isDef, false, '개발자 직접 배포는 지적이 아닌 확인 항목');
+
 /* ── 월간 점검 집계 ── */
 /* 날짜를 바꿀 때 ID 와 등록일도 함께 맞춥니다. 그러지 않으면 검사하려는
    항목 외에 ID 정합성·기한 준수까지 같이 어긋나 집계가 섞입니다. */
@@ -170,6 +193,7 @@ function mk(date, over = {}) {
     date,
     id: `QA-A-${date.replaceAll('-', '')}-01`,
     vdate: date, // ID 의 기준일이므로 날짜를 바꾸면 함께 맞춥니다
+    apprd: date, // 승인은 배포일 이전이어야 하므로 함께 맞춥니다
     qajd: date,
     reg: date, // 배포일 등록이면 어떤 유형이든 기한 이내
     ...over,
