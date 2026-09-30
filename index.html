@@ -107,6 +107,9 @@ tbody tr:hover{background:#F8FAFC}
 tbody tr.flag{background:#FDF4F5}
 tbody tr.flag:hover{background:#FBEDEF}
 td.id,td.num,td.d{font-family:var(--mono);font-size:11.5px;font-variant-numeric:tabular-nums}
+/* 비고는 길어질 수 있어 두 줄까지만 보이고, 마우스를 올리면 전체가 보입니다. */
+td.memo{min-width:160px;max-width:260px;font-size:11.5px;color:var(--ink-2)}
+td.memo>div{white-space:pre-line;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 td.act{text-align:right}
 td.act button{background:none;border:0;color:var(--ink-3);cursor:pointer;padding:2px 5px;border-radius:4px;font-size:11.5px}
 td.act button:hover{background:var(--line-2);color:var(--ink)}
@@ -189,6 +192,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 .mcell small.bad{color:var(--bad);font-weight:700}
 .mcell.on{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink) inset}
 .mperiod{margin-top:12px;font-size:12.5px;color:var(--ink-3);display:flex;align-items:center;gap:8px}
+.chk .refs{margin-top:3px;font-family:var(--mono);font-size:11px;color:var(--ink-3);line-height:1.45}
 .mperiod b{font-family:var(--mono);color:var(--ink)}
 .matchbox{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
 .matchbox label.f{width:170px}
@@ -371,7 +375,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
     <div class="grid" id="stats"></div>
 
     <div class="bar">
-      <input type="text" id="q" placeholder="ID · 시스템 · 담당자 검색" style="width:230px">
+      <input type="text" id="q" placeholder="ID · 시스템 · 담당자 · 비고 검색" style="width:250px">
       <select id="fType"><option value="">유형 전체</option><option>정규</option><option>수시</option><option>핫픽스</option></select>
       <select id="fVerdict"><option value="">판정 전체</option><option>확인필요</option><option>정상</option></select>
       <input type="date" id="fFrom" title="배포일 시작"><input type="date" id="fTo" title="배포일 종료">
@@ -387,7 +391,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
         <thead><tr>
           <th>판정</th><th>증적 문서 ID</th><th>배포일</th><th>검증 완료일</th><th>유형</th><th>대상 시스템</th>
           <th>일감 / 릴리즈</th><th>변경 작성자</th><th>검증 수행자</th><th>QA 판정</th>
-          <th>승인자</th><th>등록일</th><th>기한</th><th>상태</th><th></th>
+          <th>승인자</th><th>등록일</th><th>기한</th><th>상태</th><th>비고</th><th></th>
         </tr></thead>
         <tbody id="rows"></tbody>
       </table>
@@ -700,78 +704,61 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
     <fieldset class="fs"><legend>모집단 식별</legend>
       <div class="row">
         <label class="f"><span>배포일<em>*</em></span><input type="date" id="f_date">
-          <div class="hint">보고서의 「운영 배포 일시」와 같은 값입니다.</div></label>
-        <label class="f"><span>릴리즈 구분<em>*</em></span><select id="f_type"><option value="">선택</option><option>정규</option><option>수시</option><option>핫픽스</option></select>
-          <div class="hint">보고서의 「변경 구분」과 같은 값입니다.</div></label>
-      </div>
-      <div class="row">
-        <label class="f"><span>검증 완료일<em>*</em></span><input type="date" id="f_vdate">
-          <div class="hint">최종 회차 검증 종료일. 증적 문서 ID 의 날짜부가 이 값을 따릅니다.</div></label>
-        <label class="f"><span>릴리즈 계획일</span><input type="date" id="f_plan">
-          <div class="hint">계획된 날짜. 릴리즈가 없는 배포는 비워둡니다.</div></label>
-      </div>
-      <div class="row one">
-        <label class="f"><span>증적 문서 ID<em>*</em></span>
-          <div class="withbtn"><input type="text" id="f_id" placeholder="QA-YYYYMMDD-01"><button type="button" class="mini" id="idAdd" title="릴리즈에 포함된 다른 프로젝트의 보고서 ID 를 이어서 붙입니다">+ ID 추가</button></div>
-          <div class="hint" id="idHint">검증 완료일을 고르면 자동 생성됩니다. 보고서 본문과 게시글 제목에 동일하게 표기하십시오.</div>
-          <div class="hint">릴리즈에 프로젝트가 여러 개면 보고서 ID 를 <b>모두</b> 쉼표로 적습니다. 검증 완료일은 그중 <b>가장 늦은 날</b>입니다.</div></label>
-      </div>
-      <div class="row one">
-        <label class="f"><span>릴리즈명</span><input type="text" id="f_rel" placeholder="보고서 「릴리즈」 항목과 동일하게">
-          <div class="hint">릴리즈가 없는 배포(핫픽스 등)는 비워둡니다.</div></label>
+          <div class="hint">실제 운영 반영일. 보고서의 「운영 배포 일시」와 같은 값입니다.</div></label>
+        <label class="f"><span>릴리즈 구분<em>*</em></span><select id="f_type"><option value="">선택</option><option>정규</option><option>수시</option><option>핫픽스</option></select></label>
       </div>
       <div class="row">
         <label class="f"><span>대상 시스템<em>*</em></span>
-          <input type="text" id="f_sys" list="dlSys" placeholder="카피킬러 / muhayu-repo" autocomplete="off">
+          <input type="text" id="f_sys" list="dlSys" placeholder="HR몬스터 / 카피킬러" autocomplete="off">
           <datalist id="dlSys"></datalist></label>
         <label class="f"><span>유형 판정자<em>*</em></span><input type="text" id="f_judge"></label>
       </div>
       <div class="row one">
-        <label class="f"><span>일감 / 릴리즈 식별자</span><input type="text" id="f_task" placeholder="COW #20163">
-          <div class="hint">정규는 릴리즈 회차 또는 프로젝트명, 수시는 COW 번호, 핫픽스는 조치 내용 요약을 기재합니다.</div></label>
+        <label class="f"><span>일감 / 릴리즈 식별자</span><input type="text" id="f_task" placeholder="R1003 · COW #20163">
+          <div class="hint">정규는 워크플로우 릴리즈 번호(R1003), 수시는 COW 번호, 핫픽스는 조치 내용 요약.</div></label>
       </div>
     </fieldset>
-    <fieldset class="fs"><legend>검증 및 승인</legend>
+    <fieldset class="fs"><legend>증적</legend>
+      <div class="row one">
+        <label class="f"><span>증적 문서 ID<em>*</em></span>
+          <div class="withbtn"><input type="text" id="f_id" placeholder="QA-YYYYMMDD-01"><button type="button" class="mini" id="idAdd" title="릴리즈에 포함된 다른 프로젝트의 보고서 ID 를 이어서 붙입니다">+ ID 추가</button></div>
+          <div class="hint" id="idHint">검증 완료일을 고르면 자동 생성됩니다. 보고서 본문과 게시글 제목에 동일하게 표기하십시오.</div>
+          <div class="hint">프로젝트가 여러 개면 배포된 프로젝트의 보고서 ID 를 <b>모두</b> 적습니다.</div></label>
+      </div>
       <div class="row">
-        <label class="f"><span>변경 작성자<em>*</em></span><input type="text" id="f_dev"></label>
+        <label class="f"><span>검증 완료일<em>*</em></span><input type="date" id="f_vdate">
+          <div class="hint">보고서가 여러 개면 가장 늦은 날.</div></label>
+        <label class="f"><span>증적 등록일</span>
+          <div class="withbtn"><input type="date" id="f_reg"><button type="button" class="mini" id="regToday">오늘</button></div></label>
+      </div>
+    </fieldset>
+    <fieldset class="fs"><legend>검증 결과</legend>
+      <div class="row">
+        <label class="f"><span>변경 작성자<em>*</em></span><input type="text" id="f_dev" placeholder="개발자 · 정규는 「개발 N명 · 배포 PR #번호」"></label>
         <label class="f"><span>검증 수행자<em>*</em></span><input type="text" id="f_qa">
           <div class="hint">변경 작성자와 같을 수 없습니다.</div></label>
       </div>
       <div class="row">
-        <label class="f"><span>QA 판정</span><select id="f_verdict"><option value="">선택</option><option>통과</option><option>조건부 통과</option><option>실패</option></select>
-          <div class="hint">통과는 검증 수행자, 조건부 통과·실패는 QA유닛 리더가 판정합니다.</div></label>
-        <label class="f"><span>QA 판정자</span><input type="text" id="f_qajudge"></label>
+        <label class="f"><span>QA 판정</span><select id="f_verdict"><option value="">선택</option><option>통과</option><option>조건부 통과</option><option>실패</option></select></label>
+        <label class="f"><span>요구사항 일치</span><select id="f_req"><option value="">선택</option><option>일치</option><option>일치(범위 조정)</option><option>불일치</option></select></label>
       </div>
-      <div class="row">
-        <label class="f"><span>QA 판정일</span><input type="date" id="f_qajd"></label>
-        <label class="f"><span>배포 승인자<em>*</em></span><input type="text" id="f_appr"></label>
+      <div class="row one">
+        <label class="f"><span>미해결 보류 이슈 (즉시·긴급·높음)</span><input type="number" id="f_holdc" min="0" step="1" placeholder="0" style="max-width:160px">
+          <div class="hint">보고서 「QA 결과」의 보류 건수. 1건 이상이면 「통과」로 판정할 수 없습니다.</div></label>
       </div>
+    </fieldset>
+    <fieldset class="fs"><legend>배포 승인</legend>
       <div class="row">
-        <label class="f"><span>보류 이슈 (즉시·긴급)</span><input type="number" id="f_holdc" min="0" step="1" placeholder="0"></label>
-        <label class="f"><span>보류 이슈 (높음)</span><input type="number" id="f_holdh" min="0" step="1" placeholder="0">
-          <div class="hint">하나라도 남아 있으면 「통과」로 판정할 수 없습니다.</div></label>
-      </div>
-      <div class="row">
-        <label class="f"><span>요구사항 일치</span><select id="f_req"><option value="">선택</option><option>일치</option><option>일치(범위 조정)</option><option>불일치</option></select>
-          <div class="hint">「불일치」는 조건부 통과 이상으로 판정합니다.</div></label>
-        <label class="f"><span>요구사항 확인자</span><input type="text" id="f_reqby"></label>
-      </div>
-      <div class="row">
+        <label class="f"><span>배포 승인자<em>*</em></span><input type="text" id="f_appr">
+          <div class="hint">변경 작성자와 달라야 합니다.</div></label>
         <label class="f"><span>배포 승인일<em>*</em></span><input type="date" id="f_apprd">
-          <div class="hint">배포일 이전이어야 합니다. 승인자는 변경 작성자와 달라야 합니다.</div></label>
-        <label class="f"><span>배포 수행자<em>*</em></span><input type="text" id="f_deployer" placeholder="운영에 반영한 사람 (인프라 · 개발)">
-          <div class="hint">개발자가 배포했다면 그대로 적습니다. 배포 전 승인이 있으면 통제가 성립합니다.</div></label>
-      </div>
-      <div class="row one">
-        <label class="f"><span>배포 승인 근거</span><input type="text" id="f_apprref" placeholder="릴리즈 결재 링크 (예: flow.muhayu.com/releases/R1003) 또는 PR 주소">
-          <div class="hint">보고서의 「릴리즈 배포 관련 승인」과 같은 값입니다.</div></label>
+          <div class="hint">배포일 이전이어야 합니다.</div></label>
       </div>
       <div class="row">
-        <label class="f"><span>증적 등록일</span>
-          <div class="withbtn"><input type="date" id="f_reg"><button type="button" class="mini" id="regToday">오늘</button></div></label>
-      </div>
-      <div class="row one">
-        <label class="f"><span>증적 등록 경로</span><input type="text" id="f_path" placeholder="게시판 경로 또는 URL"></label>
+        <label class="f"><span>배포 수행자<em>*</em></span><input type="text" id="f_deployer" placeholder="운영에 반영한 사람 (인프라 · 개발)">
+          <div class="hint">개발자가 배포했다면 그대로 적습니다.</div></label>
+        <label class="f"><span>배포 승인 근거</span><input type="text" id="f_apprref" placeholder="릴리즈 결재 링크 또는 PR 주소">
+          <div class="hint">보고서의 「릴리즈 배포 관련 승인」과 같은 값.</div></label>
       </div>
     </fieldset>
     <fieldset class="fs"><legend>데이터 정합성 (PD-02)</legend>
@@ -923,12 +910,11 @@ function judge(r){
   /* QA 판정 적정성 — 즉시·긴급·높음 보류가 남으면 「통과」로 판정할 수 없습니다. */
   const held=(r.holdc===''&&r.holdh==='')?null:((+r.holdc||0)+(+r.holdh||0));
   if(!r.qav) v.verd=null;
-  else if(!r.qajudge||!r.qajd) v.verd='bad';
   else if(held!==null&&held>0&&r.qav==='통과') v.verd='bad';
   else v.verd='ok';
   /* 요구사항 일치 — 불일치는 조건부 통과 이상이어야 합니다. */
   if(!r.date) v.reqm=null;
-  else if(!r.req||!r.reqby) v.reqm='bad';
+  else if(!r.req) v.reqm='bad';
   else if(r.req==='불일치'&&r.qav==='통과') v.reqm='bad';
   else v.reqm='ok';
   v.flag = ['term','sod','appr','dep','map','integ','idc','vfy','verd','reqm'].some(k=>v[k]==='bad');
@@ -958,7 +944,7 @@ const skLines=(n,base=240)=>`<div class="skline">${
   Array.from({length:n},(_,i)=>sk(Math.max(90,base-i*38))).join('')}</div>`;
 
 /* 표 열 폭에 맞춘 스켈레톤 폭. 실제 값과 비슷한 길이로 두어 로딩 후 흔들림을 줄입니다. */
-const SK_LEDGER=[86,86,62,62,38,104,78,48,48,54,48,62,62,50,26];
+const SK_LEDGER=[86,86,62,62,38,104,78,48,48,54,48,62,62,50,150,26];
 const SK_LOG=[104,64,62,116,180];
 const SK_USERS=[138,58,58,86,44,96,74,112];
 const SK_TABLES=[120,60,58,150];
@@ -981,7 +967,8 @@ function filtered(){
     if(to&&(!r.date||r.date>to)) return false;
     if(vd&&judge(r).overall!==vd) return false;
     if(q){
-      const hay=[r.id,r.sys,r.task,r.dev,r.qa,r.appr,r.judge].join(' ').toLowerCase();
+      /* 비고에는 미포함 프로젝트 · 사후 검증 사유 · 보완 요청 같은 확인 사항이 적혀 있어 함께 찾습니다. */
+      const hay=[r.id,r.sys,r.task,r.dev,r.qa,r.appr,r.judge,r.memo].join(' ').toLowerCase();
       if(!hay.includes(q)) return false;
     }
     return true;
@@ -993,7 +980,7 @@ const PT={'통과':'p-ok','조건부 통과':'p-cond','실패':'p-fail','실패(
 function renderLedger(){
   const list=filtered(), tb=$('rows');
   if(!list.length){
-    tb.innerHTML=`<tr><td colspan="15"><div class="empty"><b>표시할 배포 건이 없습니다</b>배포 건을 추가하거나 필터를 초기화하십시오.</div></td></tr>`;
+    tb.innerHTML=`<tr><td colspan="16"><div class="empty"><b>표시할 배포 건이 없습니다</b>배포 건을 추가하거나 필터를 초기화하십시오.</div></td></tr>`;
   } else {
     tb.innerHTML=list.map(r=>{
       const v=judge(r);
@@ -1008,6 +995,7 @@ function renderLedger(){
         <td>${r.qav?`<span class="tag ${PT[r.qav]||''}">${esc(r.qav)}</span>`:''}</td>
         <td>${esc(r.appr)}</td><td class="d">${esc(r.reg)}</td>
         <td class="d">${fmt(v.deadline)}</td><td>${esc(r.state)}</td>
+        <td class="memo"${r.memo?` title="${esc(r.memo)}"`:''}><div>${esc(r.memo)}</div></td>
         <td class="act"><button data-edit="${r.k}">편집</button></td>
       </tr>`;
     }).join('');
@@ -1028,16 +1016,25 @@ function renderStats(list){
 
 /* ══════════════ 드로어 ══════════════ */
 const F={date:'f_date',type:'f_type',id:'f_id',sys:'f_sys',judge:'f_judge',task:'f_task',
-  dev:'f_dev',qa:'f_qa',qav:'f_verdict',appr:'f_appr',apprd:'f_apprd',reg:'f_reg',path:'f_path',
+  dev:'f_dev',qa:'f_qa',qav:'f_verdict',appr:'f_appr',apprd:'f_apprd',reg:'f_reg',
   schema:'f_schema',int:'f_int',intby:'f_intby',state:'f_state',exc:'f_exc',memo:'f_memo',
-  /* QA 완료 보고서 V2 대응 항목 */
-  rel:'f_rel',plan:'f_plan',vdate:'f_vdate',qajudge:'f_qajudge',qajd:'f_qajd',
-  req:'f_req',reqby:'f_reqby',holdc:'f_holdc',holdh:'f_holdh',
+  vdate:'f_vdate',req:'f_req',holdc:'f_holdc',
   /* 배포 수행 · 승인 근거 */
   deployer:'f_deployer',apprref:'f_apprref'};
 
+/* 입력 화면에서 뺀 항목 (v2.19.1)
+   보고서에 이미 있는 값이라 대장에서 다시 적지 않습니다. DB 열과 기존 값은
+   그대로 두며, 편집해 저장할 때도 불러온 값을 그대로 돌려보냅니다. 서버는
+   모든 열을 덮어쓰므로, 여기서 빼면 기존 값이 공란으로 바뀌고 그 변경이
+   이력에 남습니다. */
+const KEPT=['rel','plan','qajudge','qajd','reqby','path'];
+
 function readForm(){
   const r={}; for(const k in F) r[k]=$(F[k]).value.trim();
+  for(const k of KEPT) r[k]=editing?(editing[k]||''):'';
+  /* 보류 이슈는 한 칸(즉시·긴급·높음 합계)으로 받습니다. 이전 기록의 「높음」
+     칸은 화면을 열 때 합계에 더해 보여 주었으므로 여기서 비웁니다. */
+  r.holdh='';
   r.k=editing?editing.k:'r'+Date.now()+Math.random().toString(36).slice(2,6);
   return r;
 }
@@ -1107,6 +1104,11 @@ function openDrawer(rec){
   $('dSaveNext').hidden=ro||!!rec;
   $('dRo').hidden=!ro;
   for(const k in F){ const el=$(F[k]); el.value=rec?(rec[k]||''):''; el.disabled=ro; }
+  /* 이전 기록은 보류 이슈를 두 칸(즉시·긴급 / 높음)으로 받았으므로 합계로 보여 줍니다.
+     「높음」만 있던 기록도 빠지지 않게 합니다. */
+  if(rec&&String(rec.holdh||'').trim()!==''){
+    $('f_holdc').value=String((+rec.holdc||0)+(+rec.holdh||0));
+  }
   if(!rec) $('f_state').value='작성중';
 
   /* 신규 등록에서만 ID 를 자동으로 채웁니다. */
@@ -1422,7 +1424,7 @@ function renderCheck(){
     if(it.key==='__split__') return `<tr class="split"><td colspan="5">[ 확인 항목 ] ${esc(it.crit)}</td></tr>`;
     const hit=it.isDef&&it.n>0;
     return `<tr class="${hit?'hit':''}">
-      <td>${esc(it.name)}</td><td style="text-align:center;font-size:11px;color:var(--ink-3)">${esc(it.ctrl)}</td>
+      <td>${esc(it.name)}${refsHTML(it)}</td><td style="text-align:center;font-size:11px;color:var(--ink-3)">${esc(it.ctrl)}</td>
       <td class="c">${it.n}</td><td class="crit">${esc(it.crit)}</td>
       <td><input type="text" data-fix="${esc(it.key)}" value="${esc(fixOf(it))}" placeholder="${hit?'조치 내용 필수':''}" style="width:100%"${ro?' disabled':''}></td></tr>`;
   }).join('');
@@ -1435,10 +1437,18 @@ function renderCheck(){
   renderHist();
 }
 
+/* 해당 건의 증적 문서 ID. 반출본의 「해당 건」 열과 같은 값입니다. */
+function refsHTML(it){
+  if(!it.n) return '';
+  if(!Array.isArray(it.refs)) return '<div class="refs">(확정 당시 미기록)</div>';
+  return `<div class="refs">${it.refs.map(esc).join('<br>')}</div>`;
+}
 /* 확정 기록의 항목 목록에 확인 항목 구분선을 끼워 넣습니다. */
 function withSplit(items){
   const out=[]; let split=false;
-  (items||[]).forEach(it=>{
+  /* v2.18.1 이전 확정 기록에는 구분선이 저장되어 있어 먼저 걷어냅니다.
+     그대로 두면 구분선이 두 번 그려집니다. */
+  (items||[]).filter(it=>it.key!=='__split__').forEach(it=>{
     if(!it.isDef&&!split){
       out.push({key:'__split__',crit:'다음 항목은 지적사항이 아니며, 발생 건의 후속 조치 이행 여부를 확인합니다.'});
       split=true;
@@ -1596,20 +1606,19 @@ const DEF_IN=[
  ['증적 문서 ID','QA-{검증 완료일 YYYYMMDD}-{일련 2자리}   예) QA-20260824-01\n날짜부는 그 보고서의 검증 완료일(최종 회차)을 따릅니다. 배포일이 아닙니다. QA 완료 보고서 V2 의 부여 규칙과 같게 맞춘 것입니다.\n릴리즈 하나에 프로젝트가 여러 개면 보고서도 여러 개이므로 ID 를 모두 쉼표로 적습니다 (「+ ID 추가」). 대장의 한 줄은 배포 1건이며, 월간 점검의 모집단 대조가 배포 이력 건수와 맞도록 보고서마다 줄을 나누지 않습니다.\n한 보고서 ID 는 한 배포 건에만 적을 수 있습니다. 다른 건에 이미 있는 ID 는 저장되지 않습니다.\n일련번호는 같은 날짜 안에서 유형과 무관하게 01부터 부여합니다.\n유형은 ID 에 넣지 않습니다. 유형이 재판정되어도 ID 는 바꾸지 않으며, 재판정 사실은 변경 이력에 남습니다.\n유형코드가 들어간 구 형식(QA-A-20260814-01)도 유효한 값으로 인정합니다.\n보고서 본문과 게시글 제목에 동일 ID 를 표기합니다. 제목 표기는 ID 로 증적을 검색하기 위한 필수 요건입니다.'],
  ['배포일','실제 운영 반영일. 보고서의 「운영 배포 일시」와 같은 값입니다. 배포 이력(GitHub RELEASE 머지 PR)과 일치해야 합니다. 월간 점검의 집계 기준일이며, 배포 승인일 대조도 이 값을 기준으로 합니다.'],
  ['검증 완료일','최종 회차 검증 종료일. 보고서의 「검증 완료 일시」이자 4항 테스트 기간의 최종 회차 종료일과 같아야 합니다.\n보고서가 여러 개면 그중 가장 늦은 검증 완료일을 적습니다. 릴리즈 전체의 검증이 끝난 날입니다.\n증적 문서 ID 의 날짜부가 이 값을 따르므로 비워둘 수 없습니다.\n배포일보다 늦은 경우(사후 검증) 사유를 비고에 기재합니다. 사유가 없으면 「검증 완료일」 판정이 미비로 표기됩니다.'],
- ['릴리즈명 / 릴리즈 계획일','보고서의 「릴리즈」·「릴리즈 계획일」과 같은 값입니다. 계획일은 계획된 날짜이고 실제 반영 시각은 배포일에 적습니다.\n릴리즈가 없는 배포(핫픽스 등)는 두 항목을 비워둡니다. 보고서에는 「해당 없음」으로 기재합니다.'],
  ['릴리즈 구분','정규 / 수시 / 핫픽스를 배포 요청 시점에 판정합니다.\n다음 중 하나라도 해당하면 일감 건수와 무관하게 정규로 취급합니다 — DB 스키마 변경 또는 데이터 마이그레이션, 인증·권한·과금 로직 변경, 외부 연동 규격 변경, 신규 화면 또는 신규 기능 추가, 다수 일감 묶음 배포 또는 서비스 개편.'],
  ['유형 판정자','릴리즈 유형을 판정한 담당자. 차등 증적 적용의 정당성 근거이므로 공란으로 두지 않습니다. 판정 근거는 QA 완료 보고서에 기재합니다.'],
  ['대상 시스템','배포가 반영된 서비스·시스템명. In-scope 대상 여부의 판정 기준입니다. 리포지토리 단위로 배포되는 경우 리포지토리명을 함께 적어 배포 이력과 대조 가능하게 합니다.'],
  ['일감 / 릴리즈 식별자','유형별로 관리 단위가 달라 기재 형식도 다릅니다.\n· 정규 — 릴리즈 회차 또는 프로젝트명 (예: 2026-08 정기 릴리즈)\n· 수시 — COW 일감 번호 (예: COW #20163). URL이 아닌 식별자로 기재합니다.\n· 핫픽스 — 조치 내용 요약. 별도 식별자가 없으므로 증적 문서 ID로 식별하고 게시글 위치는 등록 경로에 적습니다.'],
  ['변경 작성자 / 검증 수행자','변경 작성자는 그 배포에 코드를 넣은 개발자, 검증 수행자는 검증한 사람입니다. 대장에 입력한 사람(최초 등록자)과는 다르며, 입력한 사람은 변경 이력에 자동으로 남습니다.\n여러 명이면 쉼표로 구분해 적습니다. 두 목록에 한 사람이라도 겹치면 직무 분리 위반입니다.\n· 수시 · 핫픽스 — 개발자 성명을 적습니다. 다른 개발자가 교차 검증하는 경우가 있어 자동 판정으로 겹침을 확인합니다.\n· 정규 (개발자 다수) — 「개발 N명 · 배포 PR #번호」로 적고, 검증 수행자가 그 PR 의 커밋 작성자에 없는지 확인한 결과를 비고에 남깁니다. 개발자 명단의 원본은 배포 PR 에 남아 있습니다.\nQA유닛이 검증하지 않는 경우 변경 작성자 이외의 개발자가 교차 검증합니다.\n판정이 문자열 비교이므로 같은 사람을 다르게 표기하지 않도록 성명으로 통일합니다.'],
- ['QA 판정 / 판정자 / 판정일','통과 / 조건부 통과 / 실패. 통과는 검증 수행자 본인, 조건부 통과와 실패는 QA유닛 리더가 판정합니다. 판정자와 판정일은 이 판정 권한을 확인하는 근거이므로 판정을 기재하면 함께 적습니다.\n판정 기준 — 즉시·긴급 또는 높음 등급의 미해결 보류가 있으면 예외 반출 승인이 있는 경우 「조건부 통과」, 없는 경우 「실패」로 합니다. 보통·낮음만 남으면 「통과」입니다. 계획된 검증 범위를 수행하지 못한 경우도 「실패」입니다.\n이전 표기 「실패(반려)」로 저장된 건은 그대로 두며 집계에서 「실패」와 같게 셉니다.\n보고서가 여러 개면 가장 낮은 판정을 적습니다 (실패 > 조건부 통과 > 통과). 판정자는 모두 쉼표로, 판정일은 가장 늦은 날을 적습니다.'],
- ['보류 이슈 (즉시·긴급 / 높음)','보고서 「QA 결과」의 보류 건수를 그대로 옮깁니다. 보류가 없으면 0 을 적습니다.\n하나라도 남아 있으면 「통과」로 판정할 수 없습니다. 이 조합은 「QA 판정 적정성」이 부적정으로 표기됩니다.\n보고서가 여러 개면 모든 보고서의 건수를 합해 적습니다.'],
- ['요구사항 일치 / 확인자','확정된 범위와 실제 변경 내역을 대조한 결과입니다. 일치 / 일치(범위 조정) / 불일치 중 하나를 적고 확인자를 함께 기재합니다.\n검증 중 범위가 변경된 경우 「일치(범위 조정)」으로 하고 변경 내용·통보 일자·결정 근거를 보고서 6항에 적습니다.\n변경 근거 없이 요청과 다른 경우에만 「불일치」로 하며, 이 경우 판정은 「조건부 통과」 이상이어야 합니다.\n보고서가 여러 개면 하나라도 「불일치」면 불일치, 불일치가 없고 「범위 조정」이 있으면 일치(범위 조정)로 적습니다. 확인자는 모두 쉼표로 적습니다.'],
+ ['QA 판정','통과 / 조건부 통과 / 실패. 보고서 「1. 요약」의 판정과 같은 값입니다.\n판정 기준 — 즉시·긴급 또는 높음 등급의 미해결 보류가 있으면 예외 반출 승인이 있는 경우 「조건부 통과」, 없는 경우 「실패」로 합니다. 보통·낮음만 남으면 「통과」입니다.\n판정자·판정일과 판정 권한(통과는 수행자 본인, 조건부 통과·실패는 QA유닛 리더)은 보고서에서 관리합니다.\n보고서가 여러 개면 가장 낮은 판정을 적습니다 (실패 > 조건부 통과 > 통과).\n이전 표기 「실패(반려)」로 저장된 건은 그대로 두며 집계에서 「실패」와 같게 셉니다.'],
+ ['미해결 보류 이슈','보고서 「QA 결과」의 보류 이슈 중 즉시·긴급·높음 등급의 합계입니다. 없으면 0 을 적습니다. 보통·낮음은 세지 않습니다.\n1건 이상이면 「통과」로 판정할 수 없으며, 이 조합은 「QA 판정 적정성」이 부적정으로 표기됩니다.\n보고서가 여러 개면 모든 보고서의 건수를 합해 적습니다.'],
+ ['요구사항 일치','확정된 범위와 실제 변경 내역을 대조한 결과입니다. 일치 / 일치(범위 조정) / 불일치. 보고서 「1. 요약」과 같은 값이며, 확인자는 보고서에서 관리합니다.\n검증 중 범위가 변경된 경우 「일치(범위 조정)」으로 하고 변경 내용·통보 일자·결정 근거를 보고서 6항에 적습니다.\n변경 근거 없이 요청과 다른 경우에만 「불일치」로 하며, 이 경우 판정은 「조건부 통과」 이상이어야 합니다.\n보고서가 여러 개면 하나라도 「불일치」면 불일치, 불일치가 없고 범위 조정이 있으면 일치(범위 조정).'],
  ['배포 승인자 / 배포 승인일 / 배포 승인 근거','PC-01의 승인 요건에 해당하는 필수 항목입니다. 「미확인」 표기는 사용하지 않습니다.\n운영에 반영해도 된다는 릴리즈 단위 승인입니다. 프로젝트 착수 때 받는 진행 승인(최종 승인 단계)과는 다르며, 진행 승인은 각 보고서의 「프로젝트 진행 관련 승인」에 적습니다.\n릴리즈 결재가 있으면 그 결재자·결재일을, 없으면 GitHub PR 머지 기록(Merged by)을 기준으로 기재합니다. 근거 칸에 결재 링크 또는 PR 주소를 적습니다.\n승인일은 배포일 이전이어야 합니다. 핫픽스는 사후 승인을 허용하며 그 사실과 사유를 비고에 적습니다.\n승인자는 변경 작성자와 달라야 하며, 검증 수행자와도 분리하는 것을 원칙으로 합니다.'],
  ['배포 수행자','운영에 실제로 반영한 사람입니다. 운영 배포는 인프라와 개발이 담당하므로 누가 반영했는지 그대로 적습니다.\n개발자가 자기 변경을 배포하는 것 자체는 위반이 아닙니다. 배포 전에 개발자가 아닌 사람이 승인했다는 것이 통제의 근거이며, 이 조건은 「승인 기록」 판정이 봅니다.\n개발자 직접 배포 건은 월간 점검의 확인 항목으로 집계해, 사전 승인과 운영 점검 여부를 확인합니다.'],
  ['스키마 · 데이터 변경','DB 스키마 변경 또는 데이터 마이그레이션 포함 여부. 「해당」이면 유형 판정 기준 제1호에 따라 정규로 취급하며 정합성 검증이 필수입니다.'],
  ['정합성 검증 / 검증자','PD-02 대응 항목. 완료 / 부적합 / 미실시로 기재하고, 스키마·데이터 변경이 「없음」인 건은 비워둡니다.\n검증 수행은 개발 5유닛, 이행 여부의 확인은 QA유닛이 합니다.'],
- ['증적 등록일 / 등록 경로','보고서를 아카이빙 채널에 등록한 날짜와 위치. 등록일은 기한 준수 판정의 기준값입니다.\n증적 내용을 링크로 대체하는 것은 금지되나, 증적의 소재를 표시하는 경로 기재는 이에 해당하지 않습니다.'],
+ ['증적 등록일','보고서를 아카이빙 채널에 등록한 날짜. 기한 준수 판정의 기준값입니다.\n보고서의 위치는 제목의 증적 문서 ID 로 검색해 찾습니다. 제목에 ID 를 표기하는 것이 필수인 이유입니다.'],
  ['증적 상태','작성중 / 등록완료 / 보완필요 / 예외승인 / 해당없음.\n· 등록완료는 작성자가 아닌 QA유닛이 확인 후 지정합니다.\n· 해당없음은 소스코드 변경이 없는 배포로 증적 대상이 아닌 건이며 사유를 비고에 적습니다.'],
  ['예외 승인자','등록 기한을 초과하거나 증적 항목을 축약한 경우 승인자를 기재합니다. 승인 권한자는 QA유닛 책임자입니다.\n이상이 없는 건에는 적지 않습니다. 초과·축약이 발생했음에도 공란인 건은 미비 건으로 관리합니다.'],
 ];
@@ -1623,8 +1632,8 @@ const DEF_FX=[
  ['정합성 확인','스키마 변경 「해당」 + 검증 「완료」 + 검증자 기재 → 정상\n스키마 변경 「해당」 + 검증 「부적합」·「미실시」 또는 검증자 공란 → 비정상\n스키마 변경 「없음」 + 검증 공란 → 미해당\n스키마 변경 「없음」인데 검증값이 있으면 → 비정상 (기재 오류이며 월간 점검에서 입력 오류로 분리 집계)'],
  ['ID 정합성','ID 가 QA-{검증 완료일 YYYYMMDD}-{일련 2자리} 형식이고 날짜부가 검증 완료일과 일치하면 정상, 그 외는 불일치.\nID 가 여러 개면 모두 검증 완료일 이전이어야 하고, 그중 하나는 검증 완료일과 같아야 합니다. 같은 ID 를 두 번 적어도 불일치입니다.\n검증 완료일이 아직 비어 있는 건은 배포일로 대조합니다. 항목이 생기기 전에 등록된 기록을 한꺼번에 불일치로 만들지 않기 위한 것이며, 누락 자체는 「검증 완료일」 판정이 잡습니다.\n구 형식 QA-{유형코드}-{날짜}-{일련} 은 유형코드가 릴리즈 구분과 일치하는지도 함께 봅니다.\n형식이 어긋나거나 날짜가 다르면 부여 오류이므로 사유를 확인해 비고에 남깁니다.'],
  ['검증 완료일 (판정)','검증 완료일이 있고 배포일 이전이면 정상.\n공란이면 미비 — 증적 문서 ID 의 기준일이므로 비워둘 수 없습니다.\n배포일보다 늦은데 비고가 비어 있으면 미비 — 사후 검증은 사유 기재가 요건입니다.'],
- ['QA 판정 적정성','QA 판정이 보고서 판정 기준에 맞는지 봅니다.\n판정자 또는 판정일이 없으면 부적정 — 판정 권한을 확인할 수 없습니다.\n즉시·긴급 또는 높음 보류가 1건 이상인데 판정이 「통과」이면 부적정.\n보류 건수를 둘 다 비워두면 이 대조는 하지 않고 판정자·판정일만 봅니다.'],
- ['요구사항 일치 (판정)','요구사항 일치 여부와 확인자가 모두 있으면 확인, 하나라도 비면 미확인.\n「불일치」인데 QA 판정이 「통과」이면 미확인 — 근거 없는 범위 이탈을 통과로 판정할 수 없습니다.'],
+ ['QA 판정 적정성','미해결 보류 이슈(즉시·긴급·높음)가 1건 이상인데 판정이 「통과」이면 부적정, 그 외는 적정.\n보류 건수를 비워두면 이 대조는 하지 않습니다.'],
+ ['요구사항 일치 (판정)','요구사항 일치 여부가 있으면 확인, 없으면 미확인.\n「불일치」인데 QA 판정이 「통과」이면 미확인 — 근거 없는 범위 이탈을 통과로 판정할 수 없습니다.'],
  ['판정 스트립 / 종합 판정','열 항목 중 하나라도 이상값이면 그 행은 확인필요로 분류되고 붉게 표시됩니다.\n판정은 입력값에서 계산되며 직접 수정할 수 없습니다. 값을 임의로 정할 수 있으면 통제의 신뢰성이 사라집니다.'],
 ];
 const SCOPE=[

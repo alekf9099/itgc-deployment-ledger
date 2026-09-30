@@ -8,8 +8,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "check": "node scripts/check.mjs && node scripts/test-judge.mjs && node scripts/test-sheet.mjs && node scripts/test-session.mjs && node scripts/test-csv.mjs && node scripts/test-import.mjs && node scripts/test-pem.mjs",
-    "test": "node scripts/test-judge.mjs && node scripts/test-sheet.mjs && node scripts/test-session.mjs && node scripts/test-csv.mjs && node scripts/test-import.mjs && node scripts/test-pem.mjs",
+    "check": "node scripts/check.mjs && node scripts/test-judge.mjs && node scripts/test-sheet.mjs && node scripts/test-session.mjs && node scripts/test-csv.mjs && node scripts/test-import.mjs && node scripts/test-pem.mjs && node scripts/test-check-export.mjs",
+    "test": "node scripts/test-judge.mjs && node scripts/test-sheet.mjs && node scripts/test-session.mjs && node scripts/test-csv.mjs && node scripts/test-import.mjs && node scripts/test-pem.mjs && node scripts/test-check-export.mjs",
     "migrate": "node scripts/migrate.mjs",
     "create-user": "node scripts/create-user.mjs"
   },

@@ -39,6 +39,9 @@ jobs:
       # 환경변수에 키를 넣는 형태가 사람마다 달라, 어느 쪽이든 서명이 되어야 합니다.
       - name: 서비스 계정 키 정리 검증
         run: node scripts/test-pem.mjs
+      # 월간 점검 반출본은 감사인에게 넘기는 산출물이라 행 구성을 고정합니다.
+      - name: 점검 반출본 검증
+        run: node scripts/test-check-export.mjs
       - name: 서버 코드 문법 검사
         run: |
           for f in api/*.js lib/*.js; do node --check "$f"; done
