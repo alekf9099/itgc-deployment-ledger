@@ -382,7 +382,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
       <button class="btn ghost" id="fClear">초기화</button>
       <div class="sp"></div>
       <div class="striplegend">
-        <span><b>스트립</b> 기한·직무·승인·매핑·정합성·ID</span>
+        <span><b>스트립</b> <span id="stripLegend"></span></span>
       </div>
     </div>
 
@@ -795,7 +795,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.20.0';
+const APP_VERSION='2.20.1';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -929,6 +929,9 @@ const LABEL={
   idc:{ok:'정상',bad:'불일치'}, vfy:{ok:'정상',bad:'미비'},
   verd:{ok:'적정',bad:'부적정'}, reqm:{ok:'확인',bad:'미확인'}, dep:{ok:'기재',bad:'미기재'}
 };
+/* 스트립 안내는 SEG 에서 만듭니다. 손으로 적어 두면 판정 항목이 늘 때
+   안내만 예전 그대로 남습니다 (6칸 안내가 10칸 스트립 위에 남아 있었음). */
+function renderStripLegend(){ $('stripLegend').textContent=SEG.map(([,n])=>n).join(' · '); }
 function stripHTML(v){
   return SEG.map(([k,n])=>`<s data-v="${v[k]||''}" title="${n}: ${v[k]?(LABEL[k][v[k]]||''):'미판정'}"></s>`).join('');
 }
@@ -1001,6 +1004,7 @@ function renderLedger(){
     }).join('');
   }
   renderStats(list);
+  renderStripLegend();
   renderSysList();
 }
 function renderStats(list){
