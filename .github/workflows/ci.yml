@@ -42,6 +42,9 @@ jobs:
       # 월간 점검 반출본은 감사인에게 넘기는 산출물이라 행 구성을 고정합니다.
       - name: 점검 반출본 검증
         run: node scripts/test-check-export.mjs
+      # 판정 규칙이 화면과 서버에 한 벌씩 있어, 한쪽만 고치면 화면과 점검 집계가 어긋납니다.
+      - name: 화면 · 서버 판정 일치 검증
+        run: node scripts/test-parity.mjs
       - name: 서버 코드 문법 검사
         run: |
           for f in api/*.js lib/*.js; do node --check "$f"; done
