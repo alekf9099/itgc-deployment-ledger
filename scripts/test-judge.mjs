@@ -118,8 +118,9 @@ eq(judge({ ...clean, qav: '통과', holdc: '1' }).verd, 'bad', '즉시·긴급 �
 eq(judge({ ...clean, qav: '통과', holdh: '2' }).verd, 'bad', '높음 보류가 남으면 통과 불가');
 eq(judge({ ...clean, qav: '조건부 통과', holdh: '2' }).verd, 'ok', '조건부 통과는 허용');
 eq(judge({ ...clean, qav: '실패', holdc: '3' }).verd, 'ok', '실패는 허용');
-eq(judge({ ...clean, qav: '통과', qajudge: '' }).verd, 'bad', '판정자 없으면 부적정');
-eq(judge({ ...clean, qav: '통과', qajd: '' }).verd, 'bad', '판정일 없으면 부적정');
+/* v2.19.1 — 판정자·판정일·확인자는 보고서에서 관리하고 대장에서 받지 않습니다. */
+eq(judge({ ...clean, qav: '통과', qajudge: '' }).verd, 'ok', '판정자는 대장 판정 대상 아님');
+eq(judge({ ...clean, qav: '통과', qajd: '' }).verd, 'ok', '판정일은 대장 판정 대상 아님');
 eq(judge({ ...clean, qav: '' }).verd, null, '판정이 없으면 미판정');
 eq(judge({ ...clean, qav: '통과', holdc: '', holdh: '' }).verd, 'ok',
   '보류 건수를 비워두면 건수 대조는 하지 않음');
@@ -128,7 +129,7 @@ eq(judge({ ...clean, qav: '통과', holdc: '', holdh: '' }).verd, 'ok',
 eq(judge({ ...clean, req: '일치', reqby: '김동완' }).reqm, 'ok', '일치 + 확인자');
 eq(judge({ ...clean, req: '일치(범위 조정)', reqby: '김동완' }).reqm, 'ok', '범위 조정도 정상');
 eq(judge({ ...clean, req: '', reqby: '김동완' }).reqm, 'bad', '일치 여부 미기재는 미확인');
-eq(judge({ ...clean, req: '일치', reqby: '' }).reqm, 'bad', '확인자 미기재는 미확인');
+eq(judge({ ...clean, req: '일치', reqby: '' }).reqm, 'ok', '확인자는 대장 판정 대상 아님');
 eq(judge({ ...clean, req: '불일치', qav: '통과' }).reqm, 'bad', '불일치인데 통과 판정은 미확인');
 eq(judge({ ...clean, req: '불일치', qav: '조건부 통과' }).reqm, 'ok', '불일치 + 조건부 통과는 정상');
 eq(judge({ ...clean, date: '' }).reqm, null, '배포일 없으면 미판정');
