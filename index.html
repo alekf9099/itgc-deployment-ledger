@@ -86,6 +86,19 @@ input[type=text],input[type=date],input[type=number],select,textarea{
 input:focus,select:focus,textarea:focus{outline:2px solid var(--focus);outline-offset:-1px;border-color:var(--focus)}
 label.f{display:block}
 label.f>span{display:block;font-size:11.5px;color:var(--ink-2);margin-bottom:4px;font-weight:600}
+/* 입력 항목 도움말 */
+.tipbtn{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;margin-left:5px;
+  border:1px solid var(--line);border-radius:50%;background:#fff;color:var(--ink-3);font:700 10px/1 var(--mono);
+  cursor:pointer;vertical-align:1px;padding:0}
+.tipbtn:hover,.tipbtn[aria-expanded="true"]{border-color:var(--ink);color:var(--ink)}
+.tippop{position:fixed;z-index:80;max-width:330px;background:#101C2E;color:#E8EDF4;border-radius:9px;padding:12px 14px;
+  font-size:12px;line-height:1.55;box-shadow:0 10px 30px rgba(16,28,46,.25)}
+.tippop[hidden]{display:none}
+.tippop b{display:block;color:#fff;font-size:12.5px;margin-bottom:5px}
+.tippop dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:4px 10px}
+.tippop dt{color:#8FA3BC;font-weight:600}
+.tippop dd{margin:0}
+.tippop .warn{color:#FFC9C9}
 label.f>span em{color:var(--bad);font-style:normal;margin-left:2px}
 label.f input,label.f select,label.f textarea{width:100%}
 .btn{background:var(--ink);color:#fff;border:0;border-radius:7px;padding:8px 15px;cursor:pointer;font-weight:600;font-size:13px}
@@ -700,6 +713,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
   </form>
 </div>
 
+<div class="tippop" id="tipPop" role="tooltip" hidden></div>
 <div class="scrim" id="scrim"></div>
 <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="dTitle">
   <header><h2 id="dTitle">배포 건 추가</h2><button class="btn ghost" id="dClose">닫기</button></header>
@@ -805,7 +819,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.22.0';
+const APP_VERSION='2.23.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -1221,6 +1235,70 @@ function renderSysList(){
   const seen=[...new Set(DATA.map(r=>r.sys).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
   $('dlSys').innerHTML=seen.map(s=>`<option value="${esc(s)}"></option>`).join('');
 }
+
+/* ══════════════ 입력 항목 도움말 ══════════════
+   칸 이름 옆 ⓘ 를 누르면 무엇을 적는지 · 예시 · 주의할 점이 보입니다.
+   자세한 규칙은 「작성 기준」 화면에 있고, 여기는 입력하면서 바로 확인할
+   요점만 둡니다. 헷갈리기 쉬운 항목(유형 판정자와 QA 판정, 정합성 검증과
+   반영 허락, 배포 승인과 프로젝트 승인)을 구분해 적었습니다. */
+const TIPS={
+  f_date:{t:'운영에 실제로 반영한 날입니다.',ex:'2026-09-30',w:'계획일이 아니라 실제 반영일입니다. 월간 점검은 이 날짜로 집계합니다.'},
+  f_type:{t:'정규 / 수시 / 핫픽스 중 하나.',ex:'정규',w:'DB 변경, 권한·과금 로직, 외부 연동 규격, 신규 화면·기능, 여러 일감 묶음 배포 중 하나라도 있으면 일감 수와 관계없이 정규입니다.'},
+  f_sys:{t:'배포가 반영된 서비스입니다.',ex:'HR 몬스터',w:'같은 시스템은 매번 같은 표기로 적습니다. 이전에 쓴 값이 자동완성으로 나옵니다.'},
+  f_judge:{t:'정규·수시·핫픽스를 정한 사람입니다. 보통 릴리즈를 만든 사람이나 PM입니다.',ex:'이득룡',w:'QA 판정(통과·실패)을 적는 칸이 아닙니다. 유형에 따라 필요한 증적이 달라, 유형을 정한 책임자를 남기는 칸입니다.'},
+  f_task:{t:'워크플로우 릴리즈 코드나 일감 번호입니다.',ex:'정규 R1052 · 수시 COW #20163 · 핫픽스 조치 요약',w:'코드를 넣으면 증적 문서 ID 가 자동으로 채워집니다.'},
+  f_id:{t:'QA 완료 보고서의 증적 문서 ID 입니다. 워크플로우 코드를 씁니다.',ex:'R1052 / P953, P1102 / 재검증 P953-02',w:'배포된 프로젝트의 보고서 ID 를 모두 적습니다. 다른 배포 건에 이미 있는 ID 는 저장되지 않습니다. 코드가 없는 배포는 「+ QA 번호」.'},
+  f_vdate:{t:'최종 회차 검증이 끝난 날입니다. 보고서의 「검증 완료 일시」.',ex:'2026-09-29',w:'보고서가 여러 개면 가장 늦은 날. 배포일보다 늦으면(사후 검증) 비고에 사유를 적습니다.'},
+  f_reg:{t:'보고서를 아카이빙 채널(동사무소)에 등록한 날입니다.',ex:'2026-09-30',w:'기한: 정규는 배포일 당일, 수시는 +3영업일, 핫픽스는 +2영업일.'},
+  f_dev:{t:'이번 배포에 코드를 넣은 개발자입니다.',ex:'박정규, 김민정, 이해령',w:'근거는 프로젝트 WBS 의 개발 단계 · 일감 담당자. 기획·PM, QA, 승인자는 넣지 않습니다. 이름을 적어야 직무 분리가 자동으로 판정됩니다.'},
+  f_qa:{t:'검증한 사람입니다. 보고서의 「3. 테스트 수행자」.',ex:'최우석, 김홍현',w:'변경 작성자와 한 명이라도 겹치면 직무 분리 위반입니다.'},
+  f_verdict:{t:'통과 / 조건부 통과 / 실패. 보고서 「1. 요약」의 판정.',ex:'조건부 통과',w:'즉시·긴급·높음 보류가 있으면 예외 반출 승인이 있을 때 조건부 통과, 없으면 실패. 보고서가 여러 개면 가장 낮은 판정.'},
+  f_req:{t:'요청한 범위대로 개발됐는지 대조한 결과입니다.',ex:'일치 / 일치(범위 조정) / 불일치',w:'「불일치」면 QA 판정은 조건부 통과 이상이어야 합니다. 데이터 정합성과는 다른 항목입니다.'},
+  f_holdc:{t:'아직 해결하지 않은 즉시·긴급·높음 이슈 수입니다.',ex:'2',w:'보통·낮음은 세지 않습니다. 없으면 0. 1 이상이면 「통과」로 판정할 수 없습니다.'},
+  f_appr:{t:'운영에 반영해도 된다고 승인한 사람입니다.',ex:'릴리즈 결재자, 없으면 RELEASE PR 의 Merged by',w:'프로젝트를 시작할 때 받는 진행 승인(최종 승인 단계)과는 다릅니다. 변경 작성자가 승인하면 안 됩니다.'},
+  f_apprd:{t:'배포 승인을 받은 날입니다.',ex:'결재일 또는 PR 머지일',w:'배포일 이전이어야 합니다. 핫픽스의 사후 승인은 비고에 사유를 적으면 허용됩니다.'},
+  f_deployer:{t:'운영에 실제로 반영한 사람입니다.',ex:'이종범 · CI/CD 자동 (이득룡 머지)',w:'부서명(인프라)이 아니라 사람 이름. DB 를 반영한 사람도 함께 적습니다.'},
+  f_apprref:{t:'배포 승인의 원본 위치입니다.',ex:'릴리즈 결재 링크 또는 github.com/…/pull/3698',w:'저장소가 여러 개면 RELEASE PR 을 모두 적습니다. 보고서의 「릴리즈 배포 관련 승인」과 같은 값.'},
+  f_schema:{t:'이번 배포가 DB 구조나 데이터를 바꿨는지입니다.',ex:'테이블·컬럼 추가, 마이그레이션, 데이터 일괄 수정 → 해당',w:'서버 증설·버전 업그레이드 같은 인프라 변경은 해당하지 않습니다. 「해당」이면 정규로 봅니다.'},
+  f_int:{t:'반영한 뒤 데이터가 맞는지 확인한 결과입니다.',ex:'완료 / 부적합 / 미실시',w:'"반영해도 될까요? / 네"는 반영 허락이지 검증이 아닙니다. "확인했고 정상"이라는 결과가 있어야 완료입니다. 변경이 없으면 비워 둡니다.'},
+  f_intby:{t:'반영 후 데이터를 직접 확인한 사람입니다.',ex:'이종범',w:'알림만 받은 사람은 넣지 않습니다.'},
+  f_state:{t:'증적 처리 상태입니다.',ex:'작성중 / 등록완료 / 보완필요 / 예외승인 / 해당없음',w:'배포된 프로젝트 중 검증 기록이 없는 것이 있으면 「보완필요」. 등록완료는 QA유닛이 확인한 뒤 지정합니다.'},
+  f_exc:{t:'규칙의 예외를 승인한 사람입니다.',ex:'등록 기한 초과, 증적 축약, 보류 이슈를 안고 배포(조건부 통과)',w:'예외가 없으면 비워 둡니다. 예외가 있는데 비어 있으면 미비 건입니다.'},
+  f_memo:{t:'판정만으로 알 수 없는 사실을 남깁니다.',ex:'미포함 프로젝트, 사후 승인·검증 사유, DB 변경 승인·반영·확인, 직무 분리 확인 근거',w:'목록에서 두 줄까지 보이고, 검색 대상입니다.'},
+};
+/* 칸 이름 옆에 ⓘ 를 붙입니다. 마크업에 손으로 넣지 않아, 칸이 바뀌어도 여기만 고치면 됩니다. */
+function mountTips(){
+  for(const id in TIPS){
+    const el=$(id); const lab=el?.closest('label.f'); const span=lab?.querySelector(':scope>span');
+    if(!span||span.querySelector('.tipbtn')) continue;
+    const b=document.createElement('button');
+    b.type='button'; b.className='tipbtn'; b.textContent='i'; b.dataset.tip=id;
+    b.setAttribute('aria-label',`${span.textContent.replace('*','').trim()} 도움말`); b.setAttribute('aria-expanded','false');
+    span.appendChild(b);
+  }
+}
+let tipOpen=null;
+function closeTip(){ $('tipPop').hidden=true; if(tipOpen){ tipOpen.setAttribute('aria-expanded','false'); tipOpen=null; } }
+document.addEventListener('click',e=>{
+  const b=e.target.closest('.tipbtn');
+  if(!b){ if(!e.target.closest('#tipPop')) closeTip(); return; }
+  /* 라벨 안의 버튼이라 기본 동작(입력칸 포커스)을 막습니다. */
+  e.preventDefault(); e.stopPropagation();
+  if(tipOpen===b){ closeTip(); return; }
+  closeTip();
+  const t=TIPS[b.dataset.tip]; if(!t) return;
+  const name=b.parentElement.firstChild.textContent.trim();
+  const pop=$('tipPop');
+  pop.innerHTML=`<b>${esc(name)}</b><dl><dt>무엇</dt><dd>${esc(t.t)}</dd><dt>예시</dt><dd>${esc(t.ex)}</dd><dt>주의</dt><dd class="warn">${esc(t.w)}</dd></dl>`;
+  pop.hidden=false;
+  const r=b.getBoundingClientRect(), w=pop.offsetWidth, h=pop.offsetHeight;
+  pop.style.left=Math.max(8,Math.min(r.left-10,innerWidth-w-8))+'px';
+  pop.style.top=(r.bottom+h+8>innerHeight?r.top-h-6:r.bottom+6)+'px';
+  b.setAttribute('aria-expanded','true'); tipOpen=b;
+},true);
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeTip(); });
+document.querySelector('#drawer .body')?.addEventListener('scroll',closeTip);
+mountTips();
 
 $('dWhy').addEventListener('click',e=>{
   const b=e.target.closest('[data-focus]'); if(!b||!b.dataset.focus) return;

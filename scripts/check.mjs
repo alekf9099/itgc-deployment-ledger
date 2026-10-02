@@ -84,6 +84,20 @@ const called = new Set([...code.matchAll(/(?<![\w$.])([A-Za-z_$][\w$]*)\s*\(/g)]
 const undef = [...called].filter((n) => !defined.has(n) && !GLOBAL.has(n) && n.length > 2).sort();
 if (undef.length) fail.push(`정의되지 않은 함수를 호출합니다: ${undef.join(', ')}`);
 
+/* 3-3. 입력 항목 도움말
+   도움말 키가 실제 입력 칸을 가리키는지, 입력 칸마다 도움말이 있는지 봅니다.
+   칸 이름을 바꾸거나 칸을 추가하면서 도움말을 빠뜨리는 것을 막습니다. */
+const tipsBlock = html.match(/const TIPS=\{([\s\S]*?)\n\};/);
+if (!tipsBlock) fail.push('입력 항목 도움말(TIPS)을 찾지 못했습니다');
+else {
+  const tipKeys = [...tipsBlock[1].matchAll(/^\s*(f_[a-z]+):\{/gm)].map((m) => m[1]);
+  const fields = [...html.matchAll(/<(?:input|select|textarea)[^>]*\sid="(f_[a-z]+)"/g)].map((m) => m[1]);
+  const noField = tipKeys.filter((k) => !fields.includes(k));
+  const noTip = fields.filter((f) => !tipKeys.includes(f));
+  if (noField.length) fail.push(`도움말이 없는 입력 칸을 가리킵니다: ${noField.join(', ')}`);
+  if (noTip.length) fail.push(`도움말이 없는 입력 칸이 있습니다: ${noTip.join(', ')}`);
+}
+
 /* 4. 버전 표기 */
 const v = html.match(/const APP_VERSION\s*=\s*'([^']+)'/);
 if (!v) fail.push("APP_VERSION 상수를 찾지 못했습니다");
