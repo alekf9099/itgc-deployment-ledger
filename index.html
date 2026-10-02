@@ -731,9 +731,9 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
     <fieldset class="fs"><legend>증적</legend>
       <div class="row one">
         <label class="f"><span>증적 문서 ID<em>*</em></span>
-          <div class="withbtn"><input type="text" id="f_id" placeholder="QA-YYYYMMDD-01"><button type="button" class="mini" id="idAdd" title="릴리즈에 포함된 다른 프로젝트의 보고서 ID 를 이어서 붙입니다">+ ID 추가</button></div>
-          <div class="hint" id="idHint">검증 완료일을 고르면 자동 생성됩니다. 보고서 본문과 게시글 제목에 동일하게 표기하십시오.</div>
-          <div class="hint">프로젝트가 여러 개면 배포된 프로젝트의 보고서 ID 를 <b>모두</b> 적습니다.</div></label>
+          <div class="withbtn"><input type="text" id="f_id" placeholder="R1052 · P953, P1166"><button type="button" class="mini" id="idAdd" title="워크플로우 코드가 없는 배포에 QA 번호(QA-YYYYMMDD-NN)를 붙입니다">+ QA 번호</button></div>
+          <div class="hint" id="idHint">보고서의 증적 문서 ID 를 적습니다. 워크플로우 코드(R1052 · P953 · T2886)를 쓰며, 식별자에 코드가 있으면 자동으로 채워집니다.</div>
+          <div class="hint">프로젝트 보고서가 여러 개면 <b>모두</b> 적습니다 (예: P953, P1102). 같은 대상을 다시 검증했으면 P953-02. 코드가 없는 배포는 「+ QA 번호」.</div></label>
       </div>
       <div class="row">
         <label class="f"><span>검증 완료일<em>*</em></span><input type="date" id="f_vdate">
@@ -805,7 +805,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.21.0';
+const APP_VERSION='2.22.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -838,9 +838,9 @@ const CODE={'정규':'R','수시':'A','핫픽스':'E'};
 /**
  * 증적 문서 ID 형식
  *
- * 현재 체계는 QA-{검증 완료일 YYYYMMDD}-{일련 2자리} 입니다. 유형은 ID 가
- * 아니라 「릴리즈 구분」 열로만 관리합니다. 기준일이 배포일이 아니라 검증
- * 완료일인 것은 QA 완료 보고서 V2 의 부여 규칙을 따른 것입니다.
+ * 기본은 워크플로우 코드(R1052 · P953 · T2886, 재검증 P953-02)입니다 (v2.22.0).
+ * 코드가 없는 배포는 QA-{검증 완료일 YYYYMMDD}-{일련 2자리} 를 쓰며, 이 형식만
+ * 날짜부를 검증 완료일과 대조합니다. 유형은 ID 가 아니라 「릴리즈 구분」으로 관리합니다.
  *
  * 유형코드가 들어간 구 형식(QA-A-20260814-01)도 인정합니다. 이미 부여된 ID 는
  * 바꾸지 않는 것이 원칙이라, 새 규칙 때문에 기존 건이 형식 위반이 되면 안 됩니다.
@@ -851,12 +851,18 @@ const ID_CURRENT=/^QA-(\d{8})-(\d{2,})$/, ID_LEGACY=/^QA-([RAE])-(\d{8})-(\d{2,}
    서버(lib/judge.js)와 같은 규칙입니다. */
 const splitDocIds=s=>String(s??'').split(/[\s,，、]+/).map(x=>x.trim()).filter(Boolean);
 const splitNames=s=>String(s??'').split(/[,，、/·]+/).map(x=>x.trim()).filter(Boolean);
+/* 워크플로우 코드(v2.22.0 부터 기본): R 릴리즈 · P 프로젝트 · T 일감, 재검증은 -02 */
+const ID_WORKFLOW=/^([RPT])(\d{3,})(?:-(\d{2}))?$/;
+const releaseCodes=s=>[...String(s??'').matchAll(/(?<![A-Za-z0-9])R(\d{3,})(?![0-9])/g)].map(m=>`R${m[1]}`);
+const workflowCodes=s=>[...String(s??'').matchAll(/(?<![A-Za-z0-9])([RPT])(\d{3,})(?![0-9])/g)].map(m=>`${m[1]}${m[2]}`);
 function parseDocId(id){
   const t=String(id??'').trim();
-  let m=ID_CURRENT.exec(t);
-  if(m) return {date:m[1],seq:+m[2],code:null};
+  let m=ID_WORKFLOW.exec(t);
+  if(m) return {kind:'wf',prefix:m[1],ref:`${m[1]}${m[2]}`,round:m[3]?+m[3]:1,date:null,code:null};
+  m=ID_CURRENT.exec(t);
+  if(m) return {kind:'qa',date:m[1],seq:+m[2],code:null};
   m=ID_LEGACY.exec(t);
-  if(m) return {date:m[2],seq:+m[3],code:m[1]};
+  if(m) return {kind:'qa',date:m[2],seq:+m[3],code:m[1]};
   return null;
 }
 const OFFSET={'정규':0,'수시':3,'핫픽스':2};
@@ -932,14 +938,18 @@ function judge(r){
   if(!ids.length||!base) v.idc=null;
   else{
     const ps=ids.map(parseDocId), b=ymd(parse(base)), baseName=r.vdate?'검증 완료일':'배포일';
+    const qaIdx=ids.map((x,n)=>n).filter(n=>ps[n]&&ps[n].kind==='qa');
     const badFmt=ids.filter((x,n)=>!ps[n]);
     const dup=ids.filter((x,n)=>ids.indexOf(x)!==n);
-    const late=ids.filter((x,n)=>ps[n]&&ps[n].date>b);
-    const codeBad=ids.filter((x,n)=>ps[n]&&ps[n].code&&(!r.type||ps[n].code!==CODE[r.type]));
-    if(badFmt.length) bad('idc',`${badFmt.join(', ')} 은(는) ID 형식이 아닙니다. QA-YYYYMMDD-01 형식으로 적으십시오.`);
+    const taskR=releaseCodes(r.task);
+    const otherR=ids.filter((x,n)=>ps[n]&&ps[n].kind==='wf'&&ps[n].prefix==='R'&&taskR.length&&!taskR.includes(ps[n].ref));
+    const late=qaIdx.filter(n=>ps[n].date>b).map(n=>ids[n]);
+    const codeBad=qaIdx.filter(n=>ps[n].code&&(!r.type||ps[n].code!==CODE[r.type])).map(n=>ids[n]);
+    if(badFmt.length) bad('idc',`${badFmt.join(', ')} 은(는) ID 형식이 아닙니다. 워크플로우 코드(R1052 · P953 · T2886, 재검증은 P953-02) 또는 QA-YYYYMMDD-01 로 적으십시오.`);
     else if(dup.length) bad('idc',`${[...new Set(dup)].join(', ')} 이(가) 두 번 적혀 있습니다.`);
+    else if(otherR.length) bad('idc',`${otherR.join(', ')} 은(는) 일감/릴리즈 식별자(${taskR.join(', ')})와 다른 릴리즈입니다. 어느 쪽이 맞는지 확인하십시오.`);
     else if(late.length) bad('idc',`${late.join(', ')} 의 날짜가 ${baseName}(${base})보다 늦습니다. ID 날짜는 그 보고서의 검증 완료일입니다.`);
-    else if(!ps.some(p=>p.date===b)) bad('idc',`${baseName}(${base})과 날짜가 같은 ID 가 없습니다. ${ids.length>1?'검증 완료일은 보고서 중 가장 늦은 날이어야 합니다.':'ID 날짜와 '+baseName+'을 맞추십시오.'}`);
+    else if(qaIdx.length===ids.length&&!qaIdx.some(n=>ps[n].date===b)) bad('idc',`${baseName}(${base})과 날짜가 같은 ID 가 없습니다. ${ids.length>1?'검증 완료일은 보고서 중 가장 늦은 날이어야 합니다.':'ID 날짜와 '+baseName+'을 맞추십시오.'}`);
     else if(codeBad.length) bad('idc',`${codeBad.join(', ')} 의 유형코드가 릴리즈 구분(${r.type||'미기재'})과 다릅니다.`);
     else v.idc='ok';
   }
@@ -1127,22 +1137,14 @@ const WHY_FIELD={term:'f_reg',sod:'f_qa',appr:'f_apprd',dep:'f_deployer',map:'f_
 let idAuto=false;
 
 function autoId(){
-  /* 이미 부여된 ID 는 배포일이나 유형이 바뀌어도 바꾸지 않습니다.
-     작성 기준상 ID 는 유형이 재판정되어도 유지되며, 어긋난 사실은
-     「ID 정합성」이 불일치로 표시해 사유를 확인하게 하는 것이 의도입니다.
-     여기서 덮어쓰면 그 흔적이 사라지고 보고서와의 매핑도 끊깁니다. */
+  /* 증적 문서 ID 는 워크플로우 코드를 씁니다(v2.22.0). 일감/릴리즈 식별자에
+     R1052 · P953 같은 코드가 있으면 그 값으로 채웁니다. 프로젝트 보고서가 따로
+     있으면 그 P 코드로 바꿔 적습니다.
+     이미 부여된 ID 는 바꾸지 않습니다. 신규 등록에서, 담당자가 ID 를 직접
+     고치기 전까지만 채웁니다. */
   if(!idAuto) return;
-  /* 기준일은 검증 완료일입니다. 아직 없으면 배포일로 임시 부여하고,
-     검증 완료일이 들어오면 아래 규칙에 따라 다시 맞춥니다. */
-  const d=$('f_vdate').value||$('f_date').value;
-  if(!d) return;
-  const ymdv=ymd(parse(d));
-  const pre=`QA-${ymdv}-`;
-  const cur=$('f_id').value.trim();
-  if(cur && cur.startsWith(pre)) return;
-  /* 일련번호는 같은 기준일 안에서 유형과 무관하게 이어집니다.
-     구 형식 건도 같은 날짜면 번호를 차지하므로 함께 셉니다. */
-  $('f_id').value=pre+pad(nextSeq(ymdv));
+  const codes=[...new Set(workflowCodes($('f_task').value))];
+  $('f_id').value=codes.join(', ');
 }
 /* 그 날짜에 이미 쓰인 일련번호 다음 값. 한 건에 ID 가 여러 개인 경우와
    입력 중인 칸의 ID 도 번호를 차지하므로 함께 셉니다. */
@@ -1189,8 +1191,8 @@ function openDrawer(rec){
   /* 신규 등록에서만 ID 를 자동으로 채웁니다. */
   idAuto=!rec;
   $('idHint').textContent=rec
-    ? '이미 부여된 ID 는 검증 완료일을 바꿔도 자동으로 변경되지 않습니다. 어긋나면 「ID 정합성」이 불일치로 표시되므로 사유를 비고에 남기십시오.'
-    : '검증 완료일을 고르면 자동 생성됩니다. 보고서 본문과 게시글 제목에 동일하게 표기하십시오.';
+    ? '이미 부여된 ID 는 자동으로 바뀌지 않습니다. 보고서의 증적 문서 ID 와 같은지 확인하십시오.'
+    : '보고서의 증적 문서 ID 를 적습니다. 워크플로우 코드(R1052 · P953 · T2886)를 쓰며, 식별자에 코드가 있으면 자동으로 채워집니다.';
 
   const carried=[];
   if(!rec&&!ro){
@@ -1683,7 +1685,7 @@ function queueDraft(){
 
 /* ══════════════ 기준 ══════════════ */
 const DEF_IN=[
- ['증적 문서 ID','QA-{검증 완료일 YYYYMMDD}-{일련 2자리}   예) QA-20260824-01\n날짜부는 그 보고서의 검증 완료일(최종 회차)을 따릅니다. 배포일이 아닙니다. QA 완료 보고서 V2 의 부여 규칙과 같게 맞춘 것입니다.\n릴리즈 하나에 프로젝트가 여러 개면 보고서도 여러 개이므로 ID 를 모두 쉼표로 적습니다 (「+ ID 추가」). 대장의 한 줄은 배포 1건이며, 월간 점검의 모집단 대조가 배포 이력 건수와 맞도록 보고서마다 줄을 나누지 않습니다.\n한 보고서 ID 는 한 배포 건에만 적을 수 있습니다. 다른 건에 이미 있는 ID 는 저장되지 않습니다.\n일련번호는 같은 날짜 안에서 유형과 무관하게 01부터 부여합니다.\n유형은 ID 에 넣지 않습니다. 유형이 재판정되어도 ID 는 바꾸지 않으며, 재판정 사실은 변경 이력에 남습니다.\n유형코드가 들어간 구 형식(QA-A-20260814-01)도 유효한 값으로 인정합니다.\n보고서 본문과 게시글 제목에 동일 ID 를 표기합니다. 제목 표기는 ID 로 증적을 검색하기 위한 필수 요건입니다.'],
+ ['증적 문서 ID','보고서의 증적 문서 ID 를 그대로 적습니다. 워크플로우가 릴리즈 · 프로젝트 · 일감을 코드로 관리하므로 그 코드를 씁니다 (v2.22.0).\n· R1052 — 릴리즈 단위 보고서\n· P953 — 프로젝트 보고서\n· T2886 — 프로젝트가 없는 수시 · 핫픽스의 일감 단위 보고서\n· P953-02 — 같은 대상을 다시 검증한 보고서 (2회차). 같은 코드가 두 배포 건에 걸리지 않게 회차를 붙입니다\n워크플로우 코드가 없는 배포는 QA 번호(QA-YYYYMMDD-NN, 날짜는 검증 완료일)를 붙입니다. 이전에 QA 번호로 부여한 ID 도 그대로 유효합니다.\n릴리즈에 프로젝트 보고서가 여러 개면 배포된 프로젝트의 보고서 ID 를 모두 적습니다. 한 보고서 ID 는 한 배포 건에만 적을 수 있습니다.\n보고서 본문과 게시글 제목에 동일 ID 를 표기합니다. 제목 표기는 ID 로 증적을 검색하기 위한 필수 요건입니다.'],
  ['배포일','실제 운영 반영일. 보고서의 「운영 배포 일시」와 같은 값입니다. 배포 이력(GitHub RELEASE 머지 PR)과 일치해야 합니다. 월간 점검의 집계 기준일이며, 배포 승인일 대조도 이 값을 기준으로 합니다.'],
  ['검증 완료일','최종 회차 검증 종료일. 보고서의 「검증 완료 일시」이자 4항 테스트 기간의 최종 회차 종료일과 같아야 합니다.\n보고서가 여러 개면 그중 가장 늦은 검증 완료일을 적습니다. 릴리즈 전체의 검증이 끝난 날입니다.\n증적 문서 ID 의 날짜부가 이 값을 따르므로 비워둘 수 없습니다.\n배포일보다 늦은 경우(사후 검증) 사유를 비고에 기재합니다. 사유가 없으면 「검증 완료일」 판정이 미비로 표기됩니다.'],
  ['릴리즈 구분','정규 / 수시 / 핫픽스를 배포 요청 시점에 판정합니다.\n다음 중 하나라도 해당하면 일감 건수와 무관하게 정규로 취급합니다 — DB 스키마 변경 또는 데이터 마이그레이션, 인증·권한·과금 로직 변경, 외부 연동 규격 변경, 신규 화면 또는 신규 기능 추가, 다수 일감 묶음 배포 또는 서비스 개편.'],
@@ -1710,7 +1712,7 @@ const DEF_FX=[
  ['배포 수행','배포 수행자가 있으면 기재, 없으면 미기재.'],
  ['증적 매핑','증적 문서 ID가 있으면 매핑완료, 없으면 매핑미완료. 증적 상태가 「해당없음」이면 해당없음.'],
  ['정합성 확인','스키마 변경 「해당」 + 검증 「완료」 + 검증자 기재 → 정상\n스키마 변경 「해당」 + 검증 「부적합」·「미실시」 또는 검증자 공란 → 비정상\n스키마 변경 「없음」 + 검증 공란 → 미해당\n스키마 변경 「없음」인데 검증값이 있으면 → 비정상 (기재 오류이며 월간 점검에서 입력 오류로 분리 집계)'],
- ['ID 정합성','ID 가 QA-{검증 완료일 YYYYMMDD}-{일련 2자리} 형식이고 날짜부가 검증 완료일과 일치하면 정상, 그 외는 불일치.\nID 가 여러 개면 모두 검증 완료일 이전이어야 하고, 그중 하나는 검증 완료일과 같아야 합니다. 같은 ID 를 두 번 적어도 불일치입니다.\n검증 완료일이 아직 비어 있는 건은 배포일로 대조합니다. 항목이 생기기 전에 등록된 기록을 한꺼번에 불일치로 만들지 않기 위한 것이며, 누락 자체는 「검증 완료일」 판정이 잡습니다.\n구 형식 QA-{유형코드}-{날짜}-{일련} 은 유형코드가 릴리즈 구분과 일치하는지도 함께 봅니다.\n형식이 어긋나거나 날짜가 다르면 부여 오류이므로 사유를 확인해 비고에 남깁니다.'],
+ ['ID 정합성','다음이면 불일치입니다.\n· 워크플로우 코드(R · P · T)나 QA 번호 형식이 아님\n· 같은 ID 를 두 번 적음\n· ID 의 릴리즈 코드(R)가 일감/릴리즈 식별자의 릴리즈 코드와 다름 — 예: 식별자 R1003 인데 ID R1052\n· QA 번호의 날짜가 검증 완료일보다 늦음, 또는 ID 가 모두 QA 번호인데 검증 완료일과 같은 날짜가 없음\n워크플로우 코드에는 날짜가 없어 날짜 대조는 QA 번호에만 적용합니다. 검증 완료일 자체는 「검증 완료일」 판정이 따로 봅니다.'],
  ['검증 완료일 (판정)','검증 완료일이 있고 배포일 이전이면 정상.\n공란이면 미비 — 증적 문서 ID 의 기준일이므로 비워둘 수 없습니다.\n배포일보다 늦은데 비고가 비어 있으면 미비 — 사후 검증은 사유 기재가 요건입니다.'],
  ['QA 판정 적정성','미해결 보류 이슈(즉시·긴급·높음)가 1건 이상인데 판정이 「통과」이면 부적정, 그 외는 적정.\n보류 건수를 비워두면 이 대조는 하지 않습니다.'],
  ['요구사항 일치 (판정)','요구사항 일치 여부가 있으면 확인, 없으면 미확인.\n「불일치」인데 QA 판정이 「통과」이면 미확인 — 근거 없는 범위 이탈을 통과로 판정할 수 없습니다.'],
@@ -2301,7 +2303,7 @@ $('fClear').onclick=()=>{['q','fType','fVerdict','fFrom','fTo'].forEach(id=>$(id
 Object.values(F).forEach(id=>$(id).addEventListener('input',()=>{
   /* 담당자가 ID 를 직접 고치면 그 뒤로는 자동으로 바꾸지 않습니다. */
   if(id==='f_id') idAuto=false;
-  if(id==='f_date'||id==='f_vdate') autoId();
+  if(id==='f_task') autoId();
   paintVerdict();
 }));
 /* 기간이 바뀌면 서버에 다시 집계를 요청하고, 대조 건수는 화면에서만 비교합니다. */
