@@ -45,6 +45,9 @@ jobs:
       # 판정 규칙이 화면과 서버에 한 벌씩 있어, 한쪽만 고치면 화면과 점검 집계가 어긋납니다.
       - name: 화면 · 서버 판정 일치 검증
         run: node scripts/test-parity.mjs
+      # 모집단을 워크플로우에서 가져오므로 중복 · 겹침 · 구성 규칙을 고정합니다.
+      - name: 워크플로우 가져오기 검증
+        run: node scripts/test-workflow.mjs
       - name: 서버 코드 문법 검사
         run: |
           for f in api/*.js lib/*.js; do node --check "$f"; done

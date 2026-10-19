@@ -283,6 +283,16 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 .modal .err.on{display:block}
 .modal label.f{margin-bottom:13px}
 .modal .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+#wfModal form{width:min(980px,100%);max-height:88vh;overflow:auto}
+.wfsum{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 10px}
+.wfsum span{font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;background:var(--line-2);color:var(--ink-2)}
+.wfsum .add{background:var(--ok-bg);color:var(--ok)} .wfsum .warn{background:var(--warn-bg);color:var(--warn)}
+.wftbl{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:14px}
+.wftbl th{text-align:left;font-size:11px;color:var(--ink-3);padding:6px 8px;border-bottom:1px solid var(--line);background:#F8F9FC}
+.wftbl td{padding:7px 8px;border-bottom:1px solid var(--line-2);vertical-align:top}
+.wftbl td.c{font-family:var(--mono);white-space:nowrap}
+.wftbl .w{color:var(--warn);font-size:11.5px}
+.wfh{font-size:12.5px;font-weight:700;margin:14px 0 6px}
 
 /* ─────────── 계정 ─────────── */
 .pwbox{background:var(--ok-bg);border:1px solid #BFE3D9;border-radius:9px;padding:14px 16px;margin-bottom:16px}
@@ -390,6 +400,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn ghost" id="exp">CSV 내보내기</button>
+        <button class="btn ghost" id="wfOpen" title="워크플로우의 완료 릴리즈를 대장으로 가져옵니다">워크플로우 가져오기</button>
         <button class="btn" id="add">배포 건 추가</button>
       </div>
     </div>
@@ -695,6 +706,25 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
   </form>
 </div>
 
+<div class="modal" id="wfModal">
+  <form id="wfForm" onsubmit="return false">
+    <h2>워크플로우 가져오기</h2>
+    <p class="m">워크플로우의 <b>완료</b> 릴리즈를 대장의 배포 건으로 가져옵니다. 이미 대장에 있는 릴리즈(R코드)는 건드리지 않고,
+      새 건은 「작성중」으로 만들어집니다. 완료일은 배포일 후보이며 실제 배포일은 확인 후 고칩니다.</p>
+    <div class="err" id="wfErr"></div>
+    <div class="row">
+      <label class="f"><span>추출 파일 (.json)</span><input type="file" id="wfFile" accept=".json,application/json"></label>
+      <label class="f"><span>가져올 시작일 (완료일 기준)</span><input type="date" id="wfFrom" value="2026-09-01"></label>
+    </div>
+    <div id="wfSource" class="hint"></div>
+    <div id="wfPlan"></div>
+    <div class="btns">
+      <button class="btn ghost" type="button" id="wfCancel">닫기</button>
+      <button class="btn ghost" type="button" id="wfPreview">미리보기</button>
+      <button class="btn" type="button" id="wfApply" disabled>가져오기</button>
+    </div>
+  </form>
+</div>
 <div class="modal" id="pwModal">
   <form id="pwForm">
     <h2 id="pwTitle">비밀번호 변경</h2>
@@ -819,7 +849,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.23.0';
+const APP_VERSION='2.24.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -1332,7 +1362,7 @@ async function loadEntryHist(rec){
     box.innerHTML=head+'<div style="color:var(--bad);margin-top:7px">이력을 불러오지 못했습니다.</div>';
   }
 }
-const ACT={'entry.create':'등록','entry.update':'수정','entry.delete':'삭제',
+const ACT={'entry.create':'등록','entry.update':'수정','entry.delete':'삭제','workflow.import':'워크플로우 가져오기',
   'check.save':'월간 점검 저장','check.delete':'월간 점검 삭제',
   'login':'로그인','login.fail':'로그인 실패','login.block':'로그인 차단','password.change':'비밀번호 변경',
   'user.create':'계정 발급','user.update':'계정 변경','user.reset':'비밀번호 재설정',
@@ -1413,6 +1443,52 @@ function fail(e){
 }
 
 /* 서버의 최신 대장으로 다시 맞춥니다. */
+/* ══════════════ 워크플로우 가져오기 ══════════════
+   추출 파일을 올려 미리보기 → 확인 → 적용합니다. 적용 시 서버가 계획을 다시
+   계산하므로, 미리보기 이후 대장이 바뀌어도 중복 · 겹침은 서버가 막습니다.
+   워크플로우 API 토큰이 생기면 파일 대신 서버가 직접 받아오도록 바꿉니다. */
+let WF=null;
+function wfReset(){ WF=null; $('wfPlan').innerHTML=''; $('wfSource').textContent=''; $('wfApply').disabled=true; $('wfErr').classList.remove('on'); }
+function wfErr(m){ $('wfErr').textContent=m; $('wfErr').classList.add('on'); }
+$('wfOpen').onclick=()=>{ wfReset(); $('wfFile').value=''; $('wfModal').classList.add('on'); };
+$('wfCancel').onclick=()=>$('wfModal').classList.remove('on');
+$('wfFile').onchange=wfReset; $('wfFrom').oninput=wfReset;
+async function wfRead(){
+  const f=$('wfFile').files[0]; if(!f) throw new Error('추출 파일을 고르십시오');
+  try{ return JSON.parse(await f.text()); }catch(e){ throw new Error('JSON 파일을 읽지 못했습니다'); }
+}
+$('wfPreview').onclick=async()=>{
+  wfReset();
+  try{
+    const data=await wfRead();
+    const {plan,source}=await api('/api/workflow-import',{method:'POST',body:{mode:'preview',data,from:$('wfFrom').value}});
+    WF={data};
+    $('wfSource').textContent=`출처 ${source.source||'미상'} · 추출 ${source.extractedAt||'미상'} (${source.extractedBy||'미상'}) · ${source.criteria||''}`;
+    const row=a=>`<tr><td class="c">${esc(a.code)}</td><td>${esc(a.entry.task.replace(a.code,'').trim())}<div style="color:var(--ink-3)">${esc(a.entry.sys)}</div></td>
+      <td>${esc(a.entry.type)}</td><td class="c">${esc(a.entry.date)}</td><td class="c">${esc(a.entry.id)}</td>
+      <td>${esc(a.entry.state)}</td><td class="w">${a.warnings.map(esc).join('<br>')}</td></tr>`;
+    $('wfPlan').innerHTML=`<div class="wfsum"><span class="add">새로 추가 ${plan.add.length}</span><span>이미 대장에 있음 ${plan.exists.length}</span>
+        <span class="warn">완료 처리 전 (확인 필요) ${plan.pending.length}</span><span>기간 밖 ${plan.outOfRange.length}</span>${plan.invalid.length?`<span class="warn">파일 오류 ${plan.invalid.length}</span>`:''}</div>
+      ${plan.add.length?`<div class="wfh">새로 추가</div><table class="wftbl"><thead><tr><th>릴리즈</th><th>제목 · 시스템</th><th>유형</th><th>완료일</th><th>증적 ID</th><th>상태</th><th>확인할 것</th></tr></thead><tbody>${plan.add.map(row).join('')}</tbody></table>`:''}
+      ${plan.exists.length?`<div class="wfh">이미 대장에 있음 (변경하지 않음)</div><table class="wftbl"><thead><tr><th>릴리즈</th><th>제목</th><th>대장 증적 ID</th><th>워크플로우 구성 중 대장에 없는 프로젝트</th></tr></thead><tbody>${plan.exists.map(e=>`<tr><td class="c">${esc(e.code)}</td><td>${esc(e.title)}</td><td class="c">${esc(e.ledgerId)}</td><td class="w">${esc(e.missing.join(', ')||'없음')}</td></tr>`).join('')}</tbody></table>`:''}
+      ${plan.pending.length?`<div class="wfh">완료 처리 전 — 실제로 배포됐다면 워크플로우에서 완료 처리 후 다시 가져오십시오</div><table class="wftbl"><thead><tr><th>릴리즈</th><th>제목</th><th>목표일</th><th>결재</th></tr></thead><tbody>${plan.pending.map(r=>`<tr><td class="c">${esc(r.code)}</td><td>${esc(r.title)}<div style="color:var(--ink-3)">${esc(r.ws)}</div></td><td class="c">${esc(r.target)}</td><td>${esc(r.approval)}</td></tr>`).join('')}</tbody></table>`:''}
+      ${plan.invalid.length?`<div class="wfh">파일 오류 — 가져오지 않음</div><table class="wftbl"><tbody>${plan.invalid.map(r=>`<tr><td class="c">${esc(r.code)}</td><td>${esc(r.title)}</td><td class="w">${esc(r.reason)}</td></tr>`).join('')}</tbody></table>`:''}`;
+    $('wfApply').disabled=!plan.add.length;
+    $('wfApply').textContent=plan.add.length?`${plan.add.length}건 가져오기`:'가져올 건 없음';
+  }catch(e){ if(e instanceof ApiError&&e.status===401) return fail(e); wfErr(e.message||'미리보기에 실패했습니다'); }
+};
+$('wfApply').onclick=async()=>{
+  if(!WF) return;
+  if(!confirm('미리보기의 새 건을 대장에 「작성중」으로 추가합니다. 진행하시겠습니까?')) return;
+  $('wfApply').disabled=true;
+  try{
+    const {created,skipped}=await api('/api/workflow-import',{method:'POST',body:{mode:'apply',data:WF.data,from:$('wfFrom').value}});
+    $('wfModal').classList.remove('on');
+    await reloadEntries();
+    toast(`${created.length}건 가져왔습니다${skipped.length?` · 제외 ${skipped.length}건`:''}`);
+  }catch(e){ $('wfApply').disabled=false; if(e instanceof ApiError&&e.status===401) return fail(e); wfErr(e.message||'가져오기에 실패했습니다'); }
+};
+
 async function reloadEntries(){
   try{
     const {entries}=await api('/api/entries');
@@ -2461,7 +2537,7 @@ async function boot(){
 
   /* 열람 전용 계정에는 대장을 바꾸는 조작을 노출하지 않습니다. */
   const ro=readonly();
-  $('add').hidden=ro; $('saveChk').hidden=ro;
+  $('add').hidden=ro; $('wfOpen').hidden=ro; $('saveChk').hidden=ro;
   ['cFrom','cTo','cDate','cBy','cApp','cPop','cPopNote','cSample','cOpinion']
     .forEach(id=>{ $(id).disabled=ro; });
 
