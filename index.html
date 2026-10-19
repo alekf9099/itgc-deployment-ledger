@@ -284,6 +284,11 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 .modal label.f{margin-bottom:13px}
 .modal .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
 #wfModal form{width:min(980px,100%);max-height:88vh;overflow:auto}
+.wfbm{border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:14px;background:#F8F9FC;font-size:12.5px}
+.wfbm summary{cursor:pointer;font-weight:600}
+.wfbm ol{margin:10px 0;padding-left:18px;line-height:1.7}
+.wfbm .bmrow{display:flex;gap:8px;align-items:center;margin:6px 0 8px}
+.wfbm a.btn{text-decoration:none;cursor:grab}
 .wfsum{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 10px}
 .wfsum span{font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;background:var(--line-2);color:var(--ink-2)}
 .wfsum .add{background:var(--ok-bg);color:var(--ok)} .wfsum .warn{background:var(--warn-bg);color:var(--warn)}
@@ -706,12 +711,149 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
   </form>
 </div>
 
+<!-- 워크플로우 추출 북마크 원본. 화면에서 javascript: 주소로 만들어 씁니다. 실행은 워크플로우 화면에서만 됩니다. -->
+<script type="text/plain" id="wfBookmarkletSrc">
+(async () => {
+  const VER = '2';
+  if (!/(^|\.)flow\.muhayu\.com$/.test(location.hostname)) { alert('워크플로우(flow.muhayu.com) 화면에서 실행하십시오.'); return; }
+  if (window.__wfExtracting) { alert('이미 추출 중입니다.'); return; }
+  window.__wfExtracting = true;
+  const pad = (n) => String(n).padStart(2, '0');
+  const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const now = new Date();
+  const today = ymd(now);
+  const from = window.__wfFrom || prompt('가져올 시작일 (완료일 기준, YYYY-MM-DD)', ymd(new Date(now.getFullYear(), now.getMonth() - 1, 1)));
+  if (!from || !/^\d{4}-\d{2}-\d{2}$/.test(from)) { window.__wfExtracting = false; return; }
+
+  const ui = document.createElement('div');
+  ui.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:2147483647;background:#111827;color:#fff;font:13px/1.5 sans-serif;padding:12px 16px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.3);max-width:360px';
+  document.body.appendChild(ui);
+  const say = (t) => { ui.textContent = '워크플로우 추출 · ' + t; };
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const go = (path) => { history.pushState({}, '', path); dispatchEvent(new PopStateEvent('popstate', { state: {} })); };
+
+  /* 화면이 스스로 불러오는 응답만 받아 둡니다. 로그인 토큰은 읽지 않습니다. */
+  const cap = {};
+  const P = XMLHttpRequest.prototype;
+  const origOpen = P.open, origSend = P.send;
+  P.open = function (m, u, ...r) { this.__wfUrl = String(u); return origOpen.call(this, m, u, ...r); };
+  P.send = function (...a) {
+    const mm = (this.__wfUrl || '').match(/\/releases\/(R\d+)\/(projects|audit-events)(\?|$)/);
+    if (mm) this.addEventListener('load', () => { try { (cap[mm[1]] || (cap[mm[1]] = {}))[mm[2]] = JSON.parse(this.responseText); } catch (e) {} });
+    return origSend.apply(this, a);
+  };
+  const restore = () => { P.open = origOpen; P.send = origSend; window.__wfExtracting = false; };
+
+  try {
+    const rowsNow = () => [...document.querySelectorAll('tbody tr, [role="row"]')].filter((tr) => tr.querySelector('a[href*="/releases/R"]'));
+    const waitRows = async () => { for (let i = 0; i < 40; i++) { if (rowsNow().length) return; await wait(300); } throw new Error('릴리즈 목록을 찾지 못했습니다.'); };
+    /* 목록이 다 그려질 때까지 기다립니다. 첫 줄만 바뀐 상태에서 읽으면 일부 건이 빠집니다. */
+    const sig = () => rowsNow().map((tr) => tr.innerText.replace(/\s+/g, ' ')).join('|');
+    const settle = async () => { let s0 = sig(), same = 0; for (let i = 0; i < 48 && same < 3; i++) { await wait(250); const n = sig(); if (n === s0 && n) same++; else { same = 0; s0 = n; } } };
+    if (!/^\/releases\/?$/.test(location.pathname)) go('/releases?jql=');
+    await waitRows();
+    await settle();
+
+    /* 첫 페이지로 */
+    for (let i = 0; i < 50; i++) {
+      const prev = document.querySelector('button[aria-label="이전 페이지로 이동"]');
+      if (!prev || prev.disabled) break;
+      prev.click();
+      await settle();
+    }
+
+    /* 목록 수집 */
+    const list = {};
+    const grab = () => rowsNow().forEach((tr) => {
+      const code = tr.querySelector('a[href*="/releases/R"]').getAttribute('href').split('?')[0].split('/').pop();
+      const c = [...tr.querySelectorAll('td,[role="cell"]')].map((x) => x.innerText.replace(/\s+/g, ' ').trim());
+      const ws = (tr.querySelector('td,[role="cell"]')?.innerText || '').split('\n')[0].trim();
+      const d8 = (c[8] || '').match(/\d{4}-\d{2}-\d{2}/), t7 = (c[7] || '').match(/\d{4}-\d{2}-\d{2}/), pr = (c[6] || '').match(/(\d+)\/(\d+)건/);
+      list[code] = { code, ws, title: (c[0] || '').replace(ws, '').trim(), status: c[1] || '', approval: c[2] || '', type: c[3] || '', owner: c[4] || '',
+        projectCount: Number(c[5]) || 0, tasksDone: pr ? +pr[1] : 0, tasks: pr ? +pr[2] : 0, target: t7 ? t7[0] : '', completed: d8 ? d8[0] : '' };
+    });
+    let page = 1;
+    grab();
+    for (let i = 0; i < 100; i++) {
+      say(`목록 ${page}페이지 · ${Object.keys(list).length}건`);
+      const next = document.querySelector('button[aria-label="다음 페이지로 이동"]');
+      if (!next || next.disabled) break;
+      next.click(); page++;
+      await settle();
+      grab();
+    }
+
+    const all = Object.values(list);
+    const targets = all.filter((r) => r.status === '완료' && r.completed && r.completed >= from);
+    const pending = all.filter((r) => r.status !== '완료' && r.target && r.target >= from && r.target < today);
+
+    /* 릴리즈마다 상세를 열어 릴리즈 구성과 변경 이력을 받습니다 */
+    const kst = (iso) => { const d = new Date(new Date(iso).getTime() + 9 * 3600e3); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`; };
+    for (let i = 0; i < targets.length; i++) {
+      const r = targets[i];
+      say(`릴리즈 구성 ${i + 1}/${targets.length} · ${r.code}`);
+      go(`/releases/${r.code}`);
+      for (let t = 0; t < 40; t++) { await wait(250); if (cap[r.code]?.projects && cap[r.code]['audit-events']) break; }
+      const c = cap[r.code] || {};
+      r.projects = (c.projects?.items || []).map((p) => ({ code: p.id, name: p.name, tasks: p.taskCount || 0, tasksDone: p.completedTaskCount || 0 }));
+      r.notes = [];
+      if (!c.projects) r.notes.push('릴리즈 구성 조회 실패 — 워크플로우에서 직접 확인');
+      for (const e of (c['audit-events']?.items || []).slice().reverse()) {
+        let p = {}; try { p = JSON.parse(e.payload); } catch (x) {}
+        const ch = (p.changes || [])[0] || {};
+        const at = kst(e.occurredAt);
+        if (e.kind === 'STATUS_CHANGED' && ch.to === 'COMPLETED') r.notes.push(`${at} 완료 처리 (${e.actorName})`);
+        if (e.kind === 'RELEASE_TYPE_CHANGED') {
+          const late = r.target && at.slice(0, 10) > r.target;
+          r.notes.push(`${at} 릴리즈 유형 ${ch.from?.name || '-'} → ${ch.to?.name || '-'} (${e.actorName})${late ? ' — 목표일 이후 변경' : ''}`);
+        }
+      }
+    }
+    go('/releases?jql=');
+
+    const out = {
+      source: 'flow.muhayu.com', extractor: `추출 북마크 v${VER}`, extractedAt: today,
+      extractedBy: '추출 북마크 (워크플로우 로그인 사용자)',
+      method: `릴리즈 목록 ${page}페이지 + 대상 릴리즈 ${targets.length}건의 릴리즈 구성 · 변경 이력 조회 (조회 전용)`,
+      criteria: `상태 완료 · 완료일 ${from} 이후 (예정 상태로 목표일이 지난 건은 확인용으로 함께 포함)`,
+      releases: [...targets, ...pending.map((r) => ({ ...r, projects: [], notes: [] }))],
+    };
+    restore();
+    if (window.__wfNoDownload) { ui.remove(); window.__wfResult = out; return; }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: 'application/json' }));
+    a.download = `workflow-releases-${today}.json`;
+    a.click();
+    say(`완료 · 대상 ${targets.length}건 · 확인용 ${pending.length}건 · 파일을 저장했습니다`);
+    setTimeout(() => ui.remove(), 6000);
+  } catch (e) {
+    restore();
+    say('실패 · ' + (e.message || e));
+    setTimeout(() => ui.remove(), 8000);
+  }
+})();
+
+</script>
 <div class="modal" id="wfModal">
   <form id="wfForm" onsubmit="return false">
     <h2>워크플로우 가져오기</h2>
     <p class="m">워크플로우의 <b>완료</b> 릴리즈를 대장의 배포 건으로 가져옵니다. 이미 대장에 있는 릴리즈(R코드)는 건드리지 않고,
       새 건은 「작성중」으로 만들어집니다. 완료일은 배포일 후보이며 실제 배포일은 확인 후 고칩니다.</p>
     <div class="err" id="wfErr"></div>
+    <details class="wfbm" id="wfBmBox">
+      <summary>추출 파일 만들기 — 추출 북마크</summary>
+      <ol>
+        <li>아래 <b>「워크플로우 추출」</b> 버튼을 브라우저 <b>즐겨찾기 막대로 끌어다 놓습니다</b> (처음 한 번만).
+          끌어 놓기가 안 되면 「코드 복사」로 새 즐겨찾기를 만들고 주소 칸에 붙여 넣습니다.</li>
+        <li>워크플로우에 로그인한 상태로 <b>릴리즈 화면</b>을 엽니다.</li>
+        <li>즐겨찾기의 「워크플로우 추출」을 누르고 시작일을 입력합니다. 끝나면 <code>workflow-releases-날짜.json</code> 이 저장됩니다.</li>
+        <li>이 창에서 그 파일을 고르고 미리보기 → 가져오기.</li>
+      </ol>
+      <div class="bmrow"><a class="btn" id="wfBm" href="#" title="즐겨찾기 막대로 끌어다 놓으십시오">워크플로우 추출</a>
+        <button type="button" class="btn ghost" id="wfBmCopy">코드 복사</button></div>
+      <p class="hint">워크플로우 화면이 스스로 불러오는 데이터만 읽습니다. 로그인 정보를 꺼내거나 다른 곳에 보내지 않고, 워크플로우에 아무것도 쓰지 않습니다.
+        워크플로우 화면 구조가 바뀌면 북마크도 갱신해야 합니다(이 창에서 다시 끌어 놓기).</p>
+    </details>
     <div class="row">
       <label class="f"><span>추출 파일 (.json)</span><input type="file" id="wfFile" accept=".json,application/json"></label>
       <label class="f"><span>가져올 시작일 (완료일 기준)</span><input type="date" id="wfFrom" value="2026-09-01"></label>
@@ -849,7 +991,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.24.0';
+const APP_VERSION='2.25.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -1450,6 +1592,14 @@ function fail(e){
 let WF=null;
 function wfReset(){ WF=null; $('wfPlan').innerHTML=''; $('wfSource').textContent=''; $('wfApply').disabled=true; $('wfErr').classList.remove('on'); }
 function wfErr(m){ $('wfErr').textContent=m; $('wfErr').classList.add('on'); }
+/* 추출 북마크 주소. 원본은 위 wfBookmarkletSrc 한 곳에만 둡니다. */
+const WF_BOOKMARKLET='javascript:'+encodeURIComponent($('wfBookmarkletSrc').textContent.trim());
+$('wfBm').href=WF_BOOKMARKLET;
+$('wfBm').onclick=e=>{ e.preventDefault(); toast('즐겨찾기 막대로 끌어다 놓으십시오. 실행은 워크플로우 화면에서 합니다'); };
+$('wfBmCopy').onclick=async()=>{
+  try{ await navigator.clipboard.writeText(WF_BOOKMARKLET); toast('복사했습니다. 새 즐겨찾기의 주소 칸에 붙여 넣으십시오'); }
+  catch(e){ prompt('아래 내용을 복사해 즐겨찾기 주소로 쓰십시오',WF_BOOKMARKLET); }
+};
 $('wfOpen').onclick=()=>{ wfReset(); $('wfFile').value=''; $('wfModal').classList.add('on'); };
 $('wfCancel').onclick=()=>$('wfModal').classList.remove('on');
 $('wfFile').onchange=wfReset; $('wfFrom').oninput=wfReset;
