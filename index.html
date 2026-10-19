@@ -346,16 +346,143 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 .bars>div{display:grid;grid-template-columns:130px 1fr 58px;gap:10px;align-items:center}
 .bars i{height:8px;border-radius:4px;background:#7FA8E8;display:block;min-width:2px;font-style:normal}
 .bars em{font-family:var(--mono);font-size:11px;color:var(--ink-3);font-style:normal;text-align:right}
+
+/* ════════════════ 디자인 레이어 (v2.24.0) ════════════════
+   기존 규칙 뒤에 두어 덮어씁니다. 판정 · 저장 로직과 무관한 표현만 바꿉니다.
+   밝은 사이드바, 부드러운 카드, 강조색 하나(--accent), 둥근 입력 요소. */
+:root{
+  --paper:#F4F6FA; --card:#FFFFFF; --ink:#111827; --ink-2:#374151; --ink-3:#6B7280;
+  --line:#E5E8EF; --line-2:#F0F2F6;
+  --accent:#4F6BFF; --accent-2:#3B55E6; --accent-bg:#EEF1FF; --accent-ink:#2F45C8;
+  --ok:#0F8A6A; --ok-bg:#E6F6F0; --bad:#D63A48; --bad-bg:#FDEEEF; --warn:#A16207; --warn-bg:#FEF6E4;
+  --focus:#4F6BFF;
+  --shadow:0 1px 2px rgba(17,24,39,.04),0 1px 3px rgba(17,24,39,.06);
+  --shadow-lg:0 12px 32px rgba(17,24,39,.10);
+  --r:14px;
+}
+body{background:var(--paper);grid-template-columns:232px 1fr}
+h1,h2,h3{letter-spacing:-.025em}
+
+/* 사이드바 */
+nav{background:#fff;color:var(--ink);border-right:1px solid var(--line);padding:18px 12px;gap:3px}
+.brand{padding:4px 10px 18px;border-bottom:0;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.brand::before{content:"";flex:0 0 30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#4F6BFF,#7C5CFF)}
+.brand b{font-size:14.5px;color:var(--ink)}
+.brand span{color:var(--ink-3);font-family:var(--sans);font-size:11px;letter-spacing:0;margin-top:2px}
+nav button{color:var(--ink-2);border-left:0;border-radius:10px;padding:9px 12px;font-size:13.5px;font-weight:500}
+nav button:hover{background:var(--line-2);color:var(--ink)}
+nav button[aria-current="true"]{background:var(--accent-bg);color:var(--accent-ink);font-weight:600;border-left:0}
+nav button i{color:#A3ABB9;font-size:10.5px}
+nav button[aria-current="true"] i{color:var(--accent)}
+.who{border-top:1px solid var(--line);padding:14px 12px 10px;margin-top:auto}
+.who b{color:var(--ink)} .who span{color:var(--ink-3)}
+.who .links{color:var(--ink-3)} .who button{color:var(--ink-3)} .who button:hover{color:var(--accent)}
+.navfoot{border-top:0;color:#A3ABB9;padding:8px 12px 0}
+
+/* 본문 */
+main{padding:30px 36px 70px}
+.head h1{font-size:25px;font-weight:700}
+.sub{color:var(--ink-3);font-size:13px}
+
+/* 버튼 · 입력 */
+.btn{background:var(--accent);border-radius:10px;padding:9px 16px;font-weight:600;box-shadow:0 1px 2px rgba(79,107,255,.25)}
+.btn:hover{background:var(--accent-2)}
+.btn.ghost{background:#fff;border:1px solid var(--line);color:var(--ink-2);box-shadow:var(--shadow)}
+.btn.ghost:hover{background:var(--line-2)}
+.btn.danger{border-radius:10px}
+input[type=text],input[type=date],input[type=number],input[type=password],select,textarea{
+  border-radius:10px;border:1px solid var(--line);padding:8px 11px;background:#fff;transition:border-color .12s,box-shadow .12s}
+input:focus,select:focus,textarea:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,107,255,.16)}
+.mini{border-radius:8px}
+
+/* 카드형 패널 · 표 */
+.panel,.tablewrap{border-radius:var(--r);border:1px solid var(--line);box-shadow:var(--shadow)}
+thead th{background:#F8F9FC;color:var(--ink-3)}
+.note{border-radius:12px}
+
+/* 드로어 */
+.drawer{border-radius:18px 0 0 18px;box-shadow:var(--shadow-lg)}
+.drawer footer{background:#fff}
+.verdict{background:#F8F9FC;border-radius:12px}
+
+/* ── 대장: 요약 카드 ── */
+.kpis{display:grid;gap:12px;grid-template-columns:repeat(4,minmax(0,1fr));margin:4px 0 18px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);
+  text-align:left;font:inherit;color:inherit;cursor:default;display:flex;flex-direction:column;gap:2px}
+.kpi[data-quick]{cursor:pointer;transition:transform .12s,border-color .12s}
+.kpi[data-quick]:hover{transform:translateY(-1px);border-color:var(--accent)}
+.kpi .k{font-size:12px;color:var(--ink-3);font-weight:500;display:flex;align-items:center;gap:6px}
+.kpi .k::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--idle)}
+.kpi .v{font-size:26px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:11.5px;color:var(--ink-3)}
+.kpi.bad{background:var(--bad-bg);border-color:#F6CDD1} .kpi.bad .k::before{background:var(--bad)} .kpi.bad .v{color:var(--bad)}
+.kpi.good .k::before{background:var(--ok)}
+.kpi.warn{background:var(--warn-bg);border-color:#F5E1B5} .kpi.warn .k::before{background:#E0A526} .kpi.warn .v{color:var(--warn)}
+.kpi.info .k::before{background:var(--accent)}
+.kpi.on{outline:2px solid var(--accent);outline-offset:1px}
+
+/* ── 대장: 필터 칩 ── */
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font-size:12.5px;color:var(--ink-2);cursor:pointer;font-weight:500}
+.chip:hover{border-color:#C9CFDB}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.chip b{font-weight:600;margin-left:4px;opacity:.7}
+.chips .sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+
+/* ── 대장: 배포 건 카드 ── */
+.ledger-list{display:grid;gap:10px}
+.ecard{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:15px 18px;box-shadow:var(--shadow);
+  cursor:pointer;transition:border-color .12s,box-shadow .12s;position:relative}
+.ecard:hover{border-color:#C9D1F5;box-shadow:0 4px 14px rgba(17,24,39,.07)}
+.ecard.flag{border-color:#F3C4C9}
+.ecard.flag::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:3px;border-radius:0 3px 3px 0;background:var(--bad)}
+.ecard .top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.ecard .code{font-family:var(--mono);font-size:11.5px;color:var(--accent-ink);background:var(--accent-bg);padding:2px 8px;border-radius:7px}
+.ecard .ttl{font-size:15px;font-weight:600;letter-spacing:-.02em}
+.ecard .sysn{font-size:12.5px;color:var(--ink-3)}
+.ecard .grow{flex:1}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px}
+.pill.ok{background:var(--ok-bg);color:var(--ok)} .pill.bad{background:var(--bad-bg);color:var(--bad)}
+.pill.muted{background:var(--line-2);color:var(--ink-3)}
+.pill.state-보완필요{background:var(--warn-bg);color:var(--warn)}
+.pill.state-예외승인{background:var(--accent-bg);color:var(--accent-ink)}
+.ecard .meta{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-top:12px}
+.ecard .meta>div{min-width:0}
+.ecard .meta dt{font-size:11px;color:var(--ink-3);margin-bottom:2px}
+.ecard .meta dd{margin:0;font-size:12.5px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ecard .meta dd.mono{font-family:var(--mono);font-size:12px}
+.ecard .why{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.ecard .why span{font-size:12px;background:var(--bad-bg);color:var(--bad);padding:4px 10px;border-radius:8px;max-width:100%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ecard .why span b{font-weight:700;margin-right:5px}
+.ecard .memo{margin-top:10px;font-size:12px;color:var(--ink-3);white-space:pre-line;display:-webkit-box;-webkit-line-clamp:2;
+  -webkit-box-orient:vertical;overflow:hidden;border-top:1px dashed var(--line);padding-top:9px}
+.ecard .strip s{width:5px;height:14px}
+.ledger-list .empty{background:#fff;border:1px dashed var(--line);border-radius:var(--r)}
+.ledger-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.ledger-tools .search{position:relative}
+.ledger-tools .search input{padding-left:34px;width:270px}
+.ledger-tools .search::before{content:"";position:absolute;left:12px;top:50%;width:12px;height:12px;margin-top:-8px;
+  border:2px solid #A3ABB9;border-radius:50%}
+.ledger-tools .search::after{content:"";position:absolute;left:23px;top:50%;width:6px;height:2px;margin-top:3px;background:#A3ABB9;transform:rotate(45deg)}
+.ledger-tools .dates{display:flex;gap:6px;align-items:center;color:var(--ink-3);font-size:12px}
+.ledger-tools .sp{flex:1}
+@media (max-width:1100px){.ecard .meta{grid-template-columns:repeat(3,minmax(0,1fr))}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
 @media (max-width:900px){
   body{grid-template-columns:1fr}
   nav{flex-direction:row;overflow-x:auto;padding:10px;align-items:center;gap:4px}
   .brand,.navfoot{display:none}
   /* 가로 배치에서는 위쪽 구분선과 여백 대신 왼쪽 구분선으로 메뉴와 나눕니다. */
-  .who{margin-top:0;padding:2px 12px;border-top:0;border-left:1px solid rgba(255,255,255,.12);
+  .who{margin-top:0;padding:2px 12px;border-top:0;border-left:1px solid var(--line);
     white-space:nowrap;flex:0 0 auto}
   .who .links{margin-top:2px}
   nav button{border-left:0;border-bottom:3px solid transparent;white-space:nowrap;padding:8px 12px}
-  nav button[aria-current="true"]{border-left-color:transparent;border-bottom-color:#5B8DEF}
+  nav button[aria-current="true"]{border-left-color:transparent;border-bottom-color:transparent}
+  nav{border-right:0;border-bottom:1px solid var(--line)}
+  .ecard .meta{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ledger-tools .search input{width:100%}
+  .ledger-tools .search{flex:1 1 100%}
   main{padding:18px 16px 50px}
   .row{grid-template-columns:1fr}
 }
@@ -394,30 +521,21 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
       </div>
     </div>
 
-    <div class="grid" id="stats"></div>
+    <div class="kpis" id="stats"></div>
 
-    <div class="bar">
-      <input type="text" id="q" placeholder="ID · 시스템 · 담당자 · 비고 검색" style="width:250px">
-      <select id="fType"><option value="">유형 전체</option><option>정규</option><option>수시</option><option>핫픽스</option></select>
-      <select id="fVerdict"><option value="">판정 전체</option><option>확인필요</option><option>정상</option></select>
-      <input type="date" id="fFrom" title="배포일 시작"><input type="date" id="fTo" title="배포일 종료">
-      <button class="btn ghost" id="fClear">초기화</button>
+    <div class="ledger-tools">
+      <div class="search"><input type="text" id="q" placeholder="R1003 · P953 · 이름 · 비고 검색" aria-label="검색"></div>
+      <div class="chips" id="fChips" role="group" aria-label="빠른 필터"></div>
       <div class="sp"></div>
-      <div class="striplegend">
-        <span><b>스트립</b> <span id="stripLegend"></span></span>
-      </div>
+      <div class="dates"><input type="date" id="fFrom" title="배포일 시작" aria-label="배포일 시작">~<input type="date" id="fTo" title="배포일 종료" aria-label="배포일 종료"></div>
+      <button class="btn ghost" id="fClear">초기화</button>
+      <!-- 칩이 아래 두 값을 바꿉니다. 반출(CSV) 이 같은 값을 읽어 화면 목록과 반출본이 같게 유지됩니다. -->
+      <select id="fType" hidden><option value="">유형 전체</option><option>정규</option><option>수시</option><option>핫픽스</option></select>
+      <select id="fVerdict" hidden><option value="">판정 전체</option><option>확인필요</option><option>정상</option></select>
     </div>
+    <div class="striplegend" style="margin:-4px 0 10px"><span><b>판정</b> <span id="stripLegend"></span></span></div>
 
-    <div class="tablewrap">
-      <table>
-        <thead><tr>
-          <th>판정</th><th>증적 문서 ID</th><th>배포일</th><th>검증 완료일</th><th>유형</th><th>대상 시스템</th>
-          <th>일감 / 릴리즈</th><th>변경 작성자</th><th>검증 수행자</th><th>QA 판정</th>
-          <th>승인자</th><th>등록일</th><th>기한</th><th>상태</th><th>비고</th><th></th>
-        </tr></thead>
-        <tbody id="rows"></tbody>
-      </table>
-    </div>
+    <div class="ledger-list" id="rows" aria-live="polite"></div>
   </section>
 
   <!-- ══════ 월간 점검 ══════ -->
@@ -1019,6 +1137,7 @@ const skLines=(n,base=240)=>`<div class="skline">${
 
 /* 표 열 폭에 맞춘 스켈레톤 폭. 실제 값과 비슷한 길이로 두어 로딩 후 흔들림을 줄입니다. */
 const SK_LEDGER=[86,86,62,62,38,104,78,48,48,54,48,62,62,50,150,26];
+const skCards=n=>Array.from({length:n},()=>`<div class="ecard" style="cursor:default">${sk(220,'b')}<div style="height:12px"></div>${sk(520)}</div>`).join('');
 const SK_LOG=[104,64,62,116,180];
 const SK_USERS=[138,58,58,86,44,96,74,112];
 const SK_TABLES=[120,60,58,150];
@@ -1067,30 +1186,48 @@ function namesCell(s,max=2){
   if(ns.length<=max) return esc(s);
   return `<span class="names" title="${esc(ns.join(', '))}">${esc(ns.slice(0,max).join(', '))} <b>외 ${ns.length-max}명</b></span>`;
 }
+/* 카드 제목: 식별자(R1003 등)를 앞세우고, 없으면 대상 시스템. */
+function cardTitle(r){
+  const codes=workflowCodes(r.task);
+  const text=String(r.task||'').replace(/워크플로우\s*#?/,'').trim();
+  return {code:codes[0]||'', title:text&&text!==codes[0]?text:(r.sys||'배포 건')};
+}
 function renderLedger(){
-  const list=filtered(), tb=$('rows');
+  const list=filtered(), box=$('rows');
   if(!list.length){
-    tb.innerHTML=`<tr><td colspan="16"><div class="empty"><b>표시할 배포 건이 없습니다</b>배포 건을 추가하거나 필터를 초기화하십시오.</div></td></tr>`;
+    box.innerHTML=`<div class="empty"><b>표시할 배포 건이 없습니다</b>배포 건을 추가하거나 필터를 초기화하십시오.</div>`;
   } else {
-    tb.innerHTML=list.map(r=>{
-      const v=judge(r);
-      return `<tr class="${v.flag?'flag':''}" data-k="${r.k}">
-        <td><span class="strip">${stripHTML(v)}</span></td>
-        <td class="id">${r.id?idsCell(r.id):'<span style="color:var(--bad)">미부여</span>'}</td>
-        <td class="d">${esc(r.date)}</td>
-        <td class="d">${esc(r.vdate)}</td>
-        <td><span class="tag t-${CODE[r.type]||''}">${esc(r.type)}</span></td>
-        <td>${esc(r.sys)}</td><td>${esc(r.task)}</td>
-        <td>${namesCell(r.dev)}</td><td>${namesCell(r.qa)}</td>
-        <td>${r.qav?`<span class="tag ${PT[r.qav]||''}">${esc(r.qav)}</span>`:''}</td>
-        <td>${esc(r.appr)}</td><td class="d">${esc(r.reg)}</td>
-        <td class="d">${fmt(v.deadline)}</td><td>${esc(r.state)}</td>
-        <td class="memo"${r.memo?` title="${esc(r.memo)}"`:''}><div>${esc(r.memo)}</div></td>
-        <td class="act"><button data-edit="${r.k}">편집</button></td>
-      </tr>`;
+    box.innerHTML=list.map(r=>{
+      const v=judge(r), t=cardTitle(r);
+      const bads=SEG.filter(([k])=>v[k]==='bad'), judged=SEG.filter(([k])=>v[k]).length;
+      const status=!r.date?`<span class="pill muted">미판정</span>`
+        :bads.length?`<span class="pill bad">확인 필요 ${bads.length}</span>`
+        :`<span class="pill ok">${judged}/${SEG.length} 정상</span>`;
+      const state=r.state?`<span class="pill muted state-${esc(r.state)}">${esc(r.state)}</span>`:'';
+      return `<article class="ecard${v.flag?' flag':''}" data-edit="${r.k}" tabindex="0" aria-label="${esc((t.code?t.code+' ':'')+t.title)} 편집">
+        <div class="top">
+          ${t.code?`<span class="code">${esc(t.code)}</span>`:''}
+          <span class="ttl">${esc(t.title)}</span>
+          ${r.sys&&t.title!==r.sys?`<span class="sysn">${esc(r.sys)}</span>`:''}
+          <span class="tag t-${CODE[r.type]||''}">${esc(r.type)}</span>
+          <span class="grow"></span>
+          <span class="strip" aria-hidden="true">${stripHTML(v)}</span>
+          ${status}${state}
+        </div>
+        <dl class="meta">
+          <div><dt>배포일</dt><dd class="mono">${esc(r.date)||'—'}${r.vdate?` <span style="color:var(--ink-3)">· 검증 ${esc(r.vdate.slice(5))}</span>`:''}</dd></div>
+          <div><dt>증적 문서 ID</dt><dd class="mono">${r.id?idsCell(r.id):'<span style="color:var(--bad)">미부여</span>'}</dd></div>
+          <div><dt>작성 → 검증</dt><dd>${namesCell(r.dev)||'—'} → ${namesCell(r.qa)||'—'}</dd></div>
+          <div><dt>배포 승인</dt><dd>${esc(r.appr)||'—'}${r.apprd?` <span style="color:var(--ink-3)">${esc(r.apprd.slice(5))}</span>`:''}</dd></div>
+          <div><dt>QA 판정</dt><dd>${r.qav?`<span class="tag ${PT[r.qav]||''}">${esc(r.qav)}</span>`:'—'}${+r.holdc?` <span style="color:var(--ink-3)">보류 ${esc(r.holdc)}</span>`:''}</dd></div>
+        </dl>
+        ${bads.length?`<div class="why">${bads.map(([k,n])=>`<span title="${esc(v.why[k]||'')}"><b>${esc(n)}</b>${esc(v.why[k]||'')}</span>`).join('')}</div>`:''}
+        ${r.memo?`<div class="memo" title="${esc(r.memo)}">${esc(r.memo)}</div>`:''}
+      </article>`;
     }).join('');
   }
   renderStats(list);
+  renderChips();
   renderStripLegend();
   renderSysList();
 }
@@ -1098,11 +1235,24 @@ function renderStats(list){
   const flags=list.filter(r=>judge(r).flag).length;
   const byType=t=>list.filter(r=>r.type===t).length;
   const hold=DATA.filter(r=>r.state==='보완필요').length;
+  const vd=$('fVerdict').value;
   $('stats').innerHTML=`
-    <div class="stat"><label>모집단 (필터 적용)</label><b>${list.length}</b><small>건</small></div>
-    <div class="stat ${flags?'hot':'good'}"><label>확인필요</label><b>${flags}</b><small>${flags?'조치 대상':'지적 없음'}</small></div>
-    <div class="stat"><label>정규 / 수시 / 핫픽스</label><b>${byType('정규')}·${byType('수시')}·${byType('핫픽스')}</b><small>유형별 분포</small></div>
-    <div class="stat ${hold?'hot':''}"><label>보완필요 (전체 누적)</label><b>${hold}</b><small>이월 관리</small></div>`;
+    <div class="kpi info"><span class="k">배포 건 (필터 적용)</span><span class="v">${list.length}</span><span class="d">정규 ${byType('정규')} · 수시 ${byType('수시')} · 핫픽스 ${byType('핫픽스')}</span></div>
+    <button type="button" class="kpi ${flags?'bad':'good'}${vd==='확인필요'?' on':''}" data-quick="확인필요" title="확인 필요 건만 보기"><span class="k">확인 필요</span><span class="v">${flags}</span><span class="d">${flags?'눌러서 해당 건만 보기':'지적 없음'}</span></button>
+    <button type="button" class="kpi good${vd==='정상'?' on':''}" data-quick="정상" title="정상 건만 보기"><span class="k">정상</span><span class="v">${list.length-flags}</span><span class="d">판정 10칸 이상 없음</span></button>
+    <div class="kpi ${hold?'warn':''}"><span class="k">증적 보완 (전체 누적)</span><span class="v">${hold}</span><span class="d">이월 관리 대상</span></div>`;
+}
+/* 빠른 필터 칩. 화면의 유형 · 판정 선택값(fType · fVerdict)을 바꿉니다. */
+const CHIP_DEF=[['vd',''],['vd','확인필요'],['vd','정상'],['sep'],['t','정규'],['t','수시'],['t','핫픽스']];
+function renderChips(){
+  const t=$('fType').value, vd=$('fVerdict').value;
+  $('fChips').innerHTML=CHIP_DEF.map(([kind,val])=>{
+    if(kind==='sep') return '<span class="sep"></span>';
+    const on=kind==='vd'?vd===val:t===val;
+    const label=kind==='vd'?(val||'전체'):val;
+    const n=kind==='vd'?(val?DATA.filter(r=>judge(r).overall===val).length:DATA.length):DATA.filter(r=>r.type===val).length;
+    return `<button type="button" class="chip" data-chip="${kind}" data-val="${esc(val)}" aria-pressed="${on}">${esc(label)}<b>${n}</b></button>`;
+  }).join('');
 }
 
 /* ══════════════ 드로어 ══════════════ */
@@ -2350,7 +2500,23 @@ $('dSave').onclick=()=>save(false);
 $('dSaveNext').onclick=()=>save(true);
 $('dDel').onclick=del;
 $('rows').addEventListener('click',e=>{
-  const k=e.target.dataset.edit; if(k) openDrawer(DATA.find(r=>r.k===k));
+  const c=e.target.closest('[data-edit]'); if(c) openDrawer(DATA.find(r=>r.k===c.dataset.edit));
+});
+$('rows').addEventListener('keydown',e=>{
+  if(e.key!=='Enter'&&e.key!==' ') return;
+  const c=e.target.closest('[data-edit]'); if(!c) return;
+  e.preventDefault(); openDrawer(DATA.find(r=>r.k===c.dataset.edit));
+});
+$('fChips').addEventListener('click',e=>{
+  const b=e.target.closest('[data-chip]'); if(!b) return;
+  const sel=b.dataset.chip==='vd'?$('fVerdict'):$('fType');
+  sel.value=(sel.value===b.dataset.val&&b.dataset.chip==='t')?'':b.dataset.val;
+  renderLedger();
+});
+$('stats').addEventListener('click',e=>{
+  const b=e.target.closest('[data-quick]'); if(!b) return;
+  $('fVerdict').value=$('fVerdict').value===b.dataset.quick?'':b.dataset.quick;
+  renderLedger();
 });
 $('histRows').addEventListener('click',async e=>{
   /* 행의 기간을 누르면 그 회차를 화면에서 엽니다. CSV 를 열지 않고도
@@ -2472,8 +2638,8 @@ async function boot(){
   if(!ro && !$('cBy').value) $('cBy').value=ME.name;
 
   /* 대장을 불러오는 동안 빈 표가 보이면 "배포 건이 없음"과 구분되지 않습니다. */
-  skOn($('stats'),skStats(4));
-  skOn($('rows'),skRows(SK_LEDGER,8));
+  skOn($('stats'),skStats(4).replaceAll('class="stat"','class="kpi"'));
+  skOn($('rows'),skCards(4));
 
   try{
     const [e,c]=await Promise.all([api('/api/entries'),api('/api/checks')]);
