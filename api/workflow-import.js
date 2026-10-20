@@ -75,6 +75,16 @@ export default async function handler(req, res) {
       const e = item.entry;
       const hit = findIdOverlap(ledger.map((x) => ({ k: x.k, doc_id: x.id })), splitDocIds(e.id));
       if (hit) { skipped.push({ code: item.code, reason: `증적 ID ${hit.id} 가 다른 건에 있음` }); continue; }
+      /* 대장에서 제외한 릴리즈를 다시 가져오면, 제외된 행은 기록으로 남기고
+         새 행을 만듭니다 (wf-R1052 → wf-R1052-2). */
+      const taken = new Set((await c.query(
+        `SELECT k FROM entries WHERE k = $1 OR k LIKE $2`, [e.k, `${e.k}-%`]
+      )).rows.map((x) => x.k));
+      if (taken.has(e.k)) {
+        let n = 2;
+        while (taken.has(`${e.k}-${n}`)) n++;
+        e.k = `${e.k}-${n}`;
+      }
       const values = toRow(e);
       const r = await c.query(
         `INSERT INTO entries (k, ${COLS.join(', ')}, created_by, created_at)

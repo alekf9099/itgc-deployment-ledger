@@ -3,7 +3,7 @@
  *
  *   GET    /api/entries            대장 전체 (삭제 표시된 건 제외)
  *   POST   /api/entries   { ...건 }  등록 또는 수정 (k 기준 upsert)
- *   DELETE /api/entries?k=...       삭제 표시 (실제 행은 남습니다)
+ *   DELETE /api/entries?k=...       삭제 표시 (실제 행은 남습니다). 여러 건은 body { ks, reason }
  *
  * 판정 결과는 저장하지 않습니다. 화면이 입력값에서 계산합니다.
  */
@@ -158,19 +158,34 @@ export default async function handler(req, res) {
     const user = await requireUser(req, res, 'admin');
     if (!user) return;
 
-    const k = String(req.query?.k ?? '').trim();
-    if (!k) return res.status(400).json({ error: '행 식별자(k)가 없습니다.' });
+    /* 한 건(?k=) 또는 여러 건(body.ks). 모집단에서 빼는 사유는 필수입니다.
+       사유 없는 제외는 감사에서 "왜 빠졌나"에 답할 수 없습니다. */
+    const b = req.body ?? {};
+    const ks = [...new Set((Array.isArray(b.ks) ? b.ks : [req.query?.k])
+      .map((x) => String(x ?? '').trim()).filter(Boolean))];
+    if (!ks.length) return res.status(400).json({ error: '행 식별자(k)가 없습니다.' });
+    if (ks.length > 500) return res.status(400).json({ error: '한 번에 500건까지 제외할 수 있습니다.' });
+    const reason = String(b.reason ?? '').trim().slice(0, 300);
+    if (reason.length < 2) return res.status(400).json({ error: '제외 사유를 적어 주십시오.' });
 
-    const row = await one(
-      `UPDATE entries SET deleted_by = $2, deleted_at = now()
-        WHERE k = $1 AND deleted_at IS NULL
-    RETURNING k, doc_id`,
-      [k, user.name]
-    );
-    if (!row) return res.status(404).json({ error: '해당 건을 찾을 수 없습니다.' });
-
-    await audit(user, 'entry.delete', k, null, row.doc_id);
-    return res.status(200).json({ ok: true });
+    const done = await tx(async (c) => {
+      const { rows } = await c.query(
+        `UPDATE entries SET deleted_by = $2, deleted_at = now()
+          WHERE k = ANY($1::text[]) AND deleted_at IS NULL
+      RETURNING k, doc_id, task`,
+        [ks, user.name]
+      );
+      for (const r of rows) {
+        await c.query(
+          `INSERT INTO audit_log (actor, actor_name, action, target, changed, note)
+           VALUES ($1, $2, 'entry.delete', $3, NULL, $4)`,
+          [user.username, user.name, r.k, `${r.doc_id || r.task || ''} · 사유: ${reason}`]
+        );
+      }
+      return rows;
+    });
+    if (!done.length) return res.status(404).json({ error: '해당 건을 찾을 수 없습니다.' });
+    return res.status(200).json({ ok: true, deleted: done.map((r) => r.k) });
   }
 
   res.setHeader('Allow', 'GET, POST, DELETE');
