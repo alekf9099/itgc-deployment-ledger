@@ -2,7 +2,7 @@
  * 워크플로우 가져오기 계획 검증
  *   node scripts/test-workflow.mjs
  */
-import { planImport, normalizeRelease } from '../lib/workflow.js';
+import { planImport, normalizeRelease, targetSystem } from '../lib/workflow.js';
 
 let pass = 0;
 const fails = [];
@@ -30,6 +30,22 @@ eq(e.date, '2026-11-25', '배포일 후보 = 완료일');
 eq(e.memo.includes('실제 배포일 확인 필요'), true, '비고에 배포일 확인 필요');
 eq(p.add[0].warnings.some((w) => w.includes('P11')), true, '일감 없이 연결된 프로젝트 경고');
 eq(e.type, '정규', '유형 그대로');
+
+/* 대장 항목 매핑 */
+eq(e.rel, '[몬스터] 11월 정기 릴리즈', '릴리즈명 = 워크플로우 제목');
+eq(e.plan, '2026-11-25', '릴리즈 계획일 = 목표일');
+eq(e.apprref, '워크플로우 R2001 릴리즈 결재 https://flow.muhayu.com/releases/R2001', '결재 승인 건은 배포 승인 근거에 결재 링크');
+eq(e.memo.includes('릴리즈 담당자 이득룡'), true, '비고에 릴리즈 담당자');
+eq(e.sys, 'HR몬스터', '태그가 워크스페이스에 들어 있으면 워크스페이스 표기');
+eq(targetSystem('CK캠퍼스', '[카피킬러] 2026/10/06 12시 핫픽스'), '카피킬러', '여러 서비스 워크스페이스는 제목 태그의 서비스');
+eq(targetSystem('CK캠퍼스', '[수시 릴리즈] OCR Controller'), 'CK캠퍼스', '유형을 적은 태그는 서비스로 보지 않음');
+eq(targetSystem('무하유', '2026년 10월 8일 공방 업데이트'), '무하유', '태그가 없으면 워크스페이스');
+p = planImport([rel({ approval: '없음' })], [], {});
+eq(p.add[0].entry.apprref, '', '결재가 없으면 배포 승인 근거를 비워 둠');
+p = planImport([rel({ title: '[CK신디] 수시 릴리즈 요청서', type: '정규' })], [], {});
+eq(p.add[0].warnings.includes('제목은 수시, 워크플로우 유형은 정규 — 유형 확인'), true, '제목과 유형이 다르면 경고');
+p = planImport([rel({ title: '2026/10 [신디] 릴리즈', type: '정규' })], [], {});
+eq(p.add[0].warnings.some((w) => w.includes('유형 확인')), false, '제목에 유형이 없으면 경고 없음');
 
 /* 프로젝트 없는 릴리즈 */
 p = planImport([rel({ tasks: 3 })], [], {});
