@@ -714,7 +714,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 <!-- 워크플로우 추출 북마크 원본. 화면에서 javascript: 주소로 만들어 씁니다. 실행은 워크플로우 화면에서만 됩니다. -->
 <script type="text/plain" id="wfBookmarkletSrc">
 (async () => {
-  const VER = '2';
+  const VER = '3';
   if (!/(^|\.)flow\.muhayu\.com$/.test(location.hostname)) { alert('워크플로우(flow.muhayu.com) 화면에서 실행하십시오.'); return; }
   if (window.__wfExtracting) { alert('이미 추출 중입니다.'); return; }
   window.__wfExtracting = true;
@@ -753,6 +753,10 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
     if (!/^\/releases\/?$/.test(location.pathname)) go('/releases?jql=');
     await waitRows();
     await settle();
+    /* 필터 · 검색이 걸린 목록을 읽으면 걸러진 건만 담겨, 모집단이 빠진 파일이 만들어집니다. */
+    const filtered = [...document.querySelectorAll('body *')].some((e) => { const t = e.textContent.replace(/\s+/g, ' ').trim(); return t.length < 40 && /^필터 ?[1-9]\d* ?개/.test(t); });
+    const searched = [...document.querySelectorAll('input')].some((i) => /검색/.test(i.placeholder || '') && i.value.trim());
+    if (filtered || searched) throw new Error('릴리즈 목록에 필터나 검색어가 걸려 있습니다. 모두 해제해 전체 릴리즈가 보이게 한 뒤 다시 실행하십시오.');
 
     /* 첫 페이지로 */
     for (let i = 0; i < 50; i++) {
@@ -829,6 +833,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
   } catch (e) {
     restore();
     say('실패 · ' + (e.message || e));
+    alert('워크플로우 추출을 멈췄습니다.' + String.fromCharCode(10, 10) + (e.message || e));
     setTimeout(() => ui.remove(), 8000);
   }
 })();
@@ -991,7 +996,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.25.0';
+const APP_VERSION='2.26.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -1590,7 +1595,7 @@ function fail(e){
    계산하므로, 미리보기 이후 대장이 바뀌어도 중복 · 겹침은 서버가 막습니다.
    워크플로우 API 토큰이 생기면 파일 대신 서버가 직접 받아오도록 바꿉니다. */
 let WF=null;
-function wfReset(){ WF=null; $('wfPlan').innerHTML=''; $('wfSource').textContent=''; $('wfApply').disabled=true; $('wfErr').classList.remove('on'); }
+function wfReset(){ WF=null; $('wfPlan').innerHTML=''; $('wfSource').textContent=''; $('wfApply').disabled=true; $('wfApply').textContent='미리보기 후 가져오기'; $('wfErr').classList.remove('on'); }
 function wfErr(m){ $('wfErr').textContent=m; $('wfErr').classList.add('on'); }
 /* 추출 북마크 주소. 원본은 위 wfBookmarkletSrc 한 곳에만 둡니다. */
 const WF_BOOKMARKLET='javascript:'+encodeURIComponent($('wfBookmarkletSrc').textContent.trim());
@@ -1602,7 +1607,8 @@ $('wfBmCopy').onclick=async()=>{
 };
 $('wfOpen').onclick=()=>{ wfReset(); $('wfFile').value=''; $('wfModal').classList.add('on'); };
 $('wfCancel').onclick=()=>$('wfModal').classList.remove('on');
-$('wfFile').onchange=wfReset; $('wfFrom').oninput=wfReset;
+/* 파일을 고르면 바로 미리보기합니다. 가져오기 버튼은 미리보기를 본 뒤에만 켜집니다. */
+$('wfFile').onchange=()=>{ wfReset(); if($('wfFile').files[0]) $('wfPreview').click(); }; $('wfFrom').oninput=wfReset;
 async function wfRead(){
   const f=$('wfFile').files[0]; if(!f) throw new Error('추출 파일을 고르십시오');
   try{ return JSON.parse(await f.text()); }catch(e){ throw new Error('JSON 파일을 읽지 못했습니다'); }
