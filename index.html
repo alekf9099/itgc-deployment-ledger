@@ -126,6 +126,12 @@ td.memo>div{white-space:pre-line;display:-webkit-box;-webkit-line-clamp:2;-webki
 td .names{white-space:nowrap;cursor:help}
 td .names b{font-weight:600;color:var(--ink-3)}
 td.act{text-align:right}
+th.sel,td.sel{width:30px;padding-left:10px;padding-right:0;text-align:center}
+th.sel input,td.sel input{width:15px;height:15px;cursor:pointer;accent-color:#2563EB}
+tr.picked td{background:#EEF4FF}
+.selbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:-4px 0 12px;padding:8px 12px;border:1px solid #C7D7FE;background:#EEF4FF;border-radius:10px;font-size:13px}
+.selbar b{font-weight:600}
+.selbar .sp{flex:1}
 td.act button{background:none;border:0;color:var(--ink-3);cursor:pointer;padding:2px 5px;border-radius:4px;font-size:11.5px}
 td.act button:hover{background:var(--line-2);color:var(--ink)}
 .tag{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:20px;font-family:var(--mono);letter-spacing:.02em}
@@ -424,10 +430,18 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
       </div>
     </div>
 
+    <div class="selbar" id="selBar" hidden>
+      <span><b id="selCount">0</b>건 선택</span>
+      <span style="color:var(--ink-3)">대장에서 제외해도 기록은 남고, 사유와 함께 변경 이력에 기록됩니다.</span>
+      <div class="sp"></div>
+      <button class="btn ghost" type="button" id="selClear">선택 해제</button>
+      <button class="btn danger" type="button" id="selDel">대장에서 제외</button>
+    </div>
+
     <div class="tablewrap">
       <table>
         <thead><tr>
-          <th>판정</th><th>증적 문서 ID</th><th>배포일</th><th>검증 완료일</th><th>유형</th><th>대상 시스템</th>
+          <th class="sel" id="selTh" hidden><input type="checkbox" id="selAll" title="보이는 건 모두 선택"></th><th>판정</th><th>증적 문서 ID</th><th>배포일</th><th>검증 완료일</th><th>유형</th><th>대상 시스템</th>
           <th>일감 / 릴리즈</th><th>변경 작성자</th><th>검증 수행자</th><th>QA 판정</th>
           <th>승인자</th><th>등록일</th><th>기한</th><th>상태</th><th>비고</th><th></th>
         </tr></thead>
@@ -996,7 +1010,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.26.0';
+const APP_VERSION='2.27.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -1247,11 +1261,13 @@ function namesCell(s,max=2){
 function renderLedger(){
   const list=filtered(), tb=$('rows');
   if(!list.length){
-    tb.innerHTML=`<tr><td colspan="16"><div class="empty"><b>표시할 배포 건이 없습니다</b>배포 건을 추가하거나 필터를 초기화하십시오.</div></td></tr>`;
+    tb.innerHTML=`<tr><td colspan="17"><div class="empty"><b>표시할 배포 건이 없습니다</b>배포 건을 추가하거나 필터를 초기화하십시오.</div></td></tr>`;
   } else {
     tb.innerHTML=list.map(r=>{
       const v=judge(r);
-      return `<tr class="${v.flag?'flag':''}" data-k="${r.k}">
+      const on=SEL.has(r.k);
+      return `<tr class="${v.flag?'flag':''}${on?' picked':''}" data-k="${r.k}">
+        ${canDel()?`<td class="sel"><input type="checkbox" data-sel="${r.k}"${on?' checked':''} aria-label="선택"></td>`:''}
         <td><span class="strip">${stripHTML(v)}</span></td>
         <td class="id">${r.id?idsCell(r.id):'<span style="color:var(--bad)">미부여</span>'}</td>
         <td class="d">${esc(r.date)}</td>
@@ -1267,6 +1283,7 @@ function renderLedger(){
       </tr>`;
     }).join('');
   }
+  renderSel(list);
   renderStats(list);
   renderStripLegend();
   renderSysList();
@@ -1561,17 +1578,45 @@ async function save(keepOpen){
   }catch(e){ fail(e); }
   finally{ btn.disabled=btn2.disabled=false; }
 }
+/* ── 대장에서 제외 ──
+   모집단에서 건을 빼는 일이라 관리자만 하고, 사유를 반드시 받습니다. 행은 지우지 않고
+   제외 표시만 하며, 사유는 건마다 변경 이력에 남습니다. */
+let SEL=new Set();
+const canDel=()=>ME?.role==='admin';
+function renderSel(list){
+  const ok=canDel();
+  const vis=new Set(list.map(r=>r.k));
+  SEL=new Set([...SEL].filter(k=>vis.has(k)&&ok));
+  $('selTh').hidden=!ok;
+  $('selBar').hidden=!SEL.size;
+  $('selCount').textContent=SEL.size;
+  $('selAll').checked=ok&&list.length>0&&SEL.size===list.length;
+  $('selAll').indeterminate=SEL.size>0&&SEL.size<list.length;
+}
+async function excludeEntries(ks){
+  if(!canDel()) return toast('대장에서 제외할 권한이 없습니다');
+  const rows=DATA.filter(r=>ks.includes(r.k));
+  if(!rows.length) return false;
+  const NL=String.fromCharCode(10);
+  const names=rows.slice(0,5).map(r=>'· '+(r.task||r.id||r.date)).concat(rows.length>5?[`· 외 ${rows.length-5}건`]:[]).join(NL);
+  const reason=prompt([`${rows.length}건을 대장에서 제외합니다.`,names,'',
+    '기록은 남고 변경 이력에 사유와 함께 기록됩니다. 제외 사유를 적으십시오.',
+    '(예: 중복 등록 · 운영 배포 아님 · 잘못 가져옴)'].join(NL),'');
+  if(reason===null) return false;
+  if(reason.trim().length<2){ toast('제외 사유를 적어야 합니다'); return false; }
+  try{
+    const {deleted}=await api('/api/entries',{method:'DELETE',body:{ks:rows.map(r=>r.k),reason:reason.trim()}});
+    const gone=new Set(deleted);
+    DATA=DATA.filter(x=>!gone.has(x.k));
+    deleted.forEach(k=>SEL.delete(k));
+    renderLedger(); scheduleSummary(); scheduleSheetPush();
+    toast(`${deleted.length}건을 대장에서 제외했습니다`);
+    return true;
+  }catch(e){ fail(e); return false; }
+}
 async function del(){
   if(!editing) return;
-  if(ME?.role!=='admin') return toast('삭제 권한이 없습니다');
-  const label=editing.id||editing.date||'선택한 건';
-  if(!confirm(`${label} 건을 대장에서 제외합니다.\n\n기록은 변경 이력에 남으며 되돌리려면 관리자가 DB에서 처리해야 합니다. 진행하시겠습니까?`)) return;
-  try{
-    await api('/api/entries?k='+encodeURIComponent(editing.k),{method:'DELETE'});
-    DATA=DATA.filter(x=>x.k!==editing.k);
-    closeDrawer(); renderLedger(); scheduleSummary(); scheduleSheetPush();
-    toast('대장에서 제외했습니다');
-  }catch(e){ fail(e); }
+  if(await excludeEntries([editing.k])) closeDrawer();
 }
 
 /* 세션이 끊긴 경우와 그 밖의 오류를 구분해 처리합니다. */
@@ -2582,8 +2627,13 @@ $('dSave').onclick=()=>save(false);
 $('dSaveNext').onclick=()=>save(true);
 $('dDel').onclick=del;
 $('rows').addEventListener('click',e=>{
+  const s=e.target.dataset.sel;
+  if(s!==undefined){ e.target.checked?SEL.add(s):SEL.delete(s); e.target.closest('tr').classList.toggle('picked',e.target.checked); renderSel(filtered()); return; }
   const k=e.target.dataset.edit; if(k) openDrawer(DATA.find(r=>r.k===k));
 });
+$('selAll').onchange=e=>{ const list=filtered(); SEL=e.target.checked?new Set(list.map(r=>r.k)):new Set(); renderLedger(); };
+$('selClear').onclick=()=>{ SEL=new Set(); renderLedger(); };
+$('selDel').onclick=()=>excludeEntries([...SEL]);
 $('histRows').addEventListener('click',async e=>{
   /* 행의 기간을 누르면 그 회차를 화면에서 엽니다. CSV 를 열지 않고도
      지난 점검을 확인할 수 있어야 합니다. */
