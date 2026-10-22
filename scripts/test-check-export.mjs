@@ -17,7 +17,7 @@ const eq = (a, b, label) => {
 };
 
 const clean = {
-  type: '수시', judge: '김판정', dev: '이개발', qa: '박검증', appr: '최승인',
+  type: '수시', judge: '김판정', dev: '이개발', qa: '박검증', appr: '김경수',
   schema: '없음', int: '', intby: '', state: '등록완료', qav: '통과', qajudge: '박검증',
   req: '일치', reqby: '김동완', holdc: '', holdh: '', memo: '',
 };

@@ -47,6 +47,101 @@ eq(p.add[0].warnings.includes('제목은 수시, 소프트팩토리 유형은 �
 p = planImport([rel({ title: '2026/10 [신디] 릴리즈', type: '정규' })], [], {});
 eq(p.add[0].warnings.some((w) => w.includes('유형 확인')), false, '제목에 유형이 없으면 경고 없음');
 
+/* ── v4 추출 파일: 결재 · 일감으로 증적 채우기 ── */
+const T = (id, o = {}) => ({ id, title: '', project: '', parent: '', phase: '', type: '일감', menu: '', status: '완료', done: true,
+  assignee: '', requester: '', completer: '', completedAt: '2026-11-20 10:00', ...o });
+const v4 = (over = {}) => rel({
+  owner: '이득룡', completed: '2026-11-25', target: '2026-11-25',
+  projects: [{ code: 'P10', name: 'A', tasks: 9, tasksDone: 9 }],
+  releaseApproval: { status: 'APPROVED', completedAt: '2026-11-24 12:00', approvers: [{ name: '김경수', decision: 'APPROVED', at: '2026-11-24 12:00' }] },
+  items: [
+    T('T1', { project: 'P10', title: '승인', type: '프로젝트 승인', assignee: '김경수', completer: '김경수', completedAt: '2026-11-01 10:00' }),
+    T('T2', { project: 'P10', parent: 'T1', phase: '승인', title: 'QA 승인', type: '1차 승인', menu: 'APPROVAL', assignee: '이광주' }),
+    T('T3', { project: 'P10', title: '개발', type: '일감' }),
+    T('T4', { project: 'P10', parent: 'T3', phase: '개발', title: '번역 API 개발', assignee: '박개발' }),
+    T('T5', { project: 'P10', parent: 'T3', phase: '개발', title: '개발자 테스트', assignee: '최개발' }),
+    T('T6', { project: 'P10', parent: 'T3', phase: '개발', title: '기획자 테스트', assignee: '김기획' }),
+    T('T7', { project: 'P10', title: '검토' }),
+    T('T8', { project: 'P10', parent: 'T7', phase: '검토', title: 'QA 테스트', assignee: '김홍현' }),
+    T('T9', { project: 'P10', parent: 'T8', phase: '검토', title: '[결함] 문구 오류', assignee: '박개발', done: false, status: '요청' }),
+    T('T10', { project: 'P10', parent: 'T7', phase: '완료', title: 'QA평가', type: '평가', assignee: '이광주', done: false, status: '예정' }),
+    T('T20', { title: '[개발] PDF 구현', assignee: '장개발', requester: '김기획' }),
+    T('T21', { title: '[기획] PDF 기획', assignee: '김재현' }),
+    T('T22', { title: '[QC] 기획 관점 점검', assignee: '김재현' }),
+    T('T23', { title: '[개발] PDF 테스트 대상', assignee: '장개발' }),
+    T('T24', { parent: 'T23', title: '개발자 테스트', assignee: '장개발' }),
+    T('T25', { title: '팝업 버튼 추가', assignee: '송개발', done: false, status: '진행' }),
+  ],
+  ...over,
+});
+p = planImport([v4()], [], { from: '2026-09-01' });
+let w = p.add[0].warnings, en = p.add[0].entry;
+eq(en.id, 'P10, T20, T21, T22, T23, T25', '증적 ID = 프로젝트 + 프로젝트가 아닌 최상위 일감');
+eq(en.appr, '김경수', '릴리즈 결재자 = 배포 승인자');
+eq(en.apprd, '2026-11-24', '결재 일시 = 배포 승인일');
+eq(en.deployer, '이득룡', '릴리즈 담당자 = 배포 수행자');
+eq(en.dev, '박개발, 최개발, 장개발, 송개발', '개발 단계 담당자 + 개발 일감 담당자 (기획 · QC · 기획자 테스트 제외)');
+eq(en.memo.includes('P10 [PD-01] · 프로젝트 승인 김경수 2026-11-01'), true, '프로젝트 증적 요약');
+eq(en.memo.includes('결함 1건(미해결 1)'), true, 'PD-03 결함 요약');
+eq(w.includes('P10 미해결 결함 1건'), true, '미해결 결함 경고');
+eq(w.includes('T25 미완료 일감 포함 (진행)'), true, '미완료 일감 경고');
+eq(w.some((x) => x.startsWith('T20 테스트 증적 없음')), true, '테스트 하위 일감이 없으면 PC-01 경고');
+eq(w.some((x) => x.startsWith('T23 테스트 증적 없음')), false, '개발자 테스트 하위 일감이 있으면 경고 없음');
+eq(w.includes('김재현 님이 기획과 QC 를 함께 담당 — 관찰 사항'), true, '기획 · QC 겸임 관찰');
+eq(w.some((x) => x.includes('전결권자')), false, '결재자 · 프로젝트 승인자가 C레벨이면 경고 없음');
+
+p = planImport([v4({ releaseApproval: { status: 'APPROVED', approvers: [{ name: '이득룡', decision: 'APPROVED', at: '2026-11-26 09:00' }] } })], [], {});
+w = p.add[0].warnings;
+eq(w.includes('릴리즈 결재자 이득룡 중 전결권자(C레벨) 없음'), true, '결재자가 C레벨이 아니면 경고');
+eq(w.includes('릴리즈 결재자가 릴리즈 담당자 본인(이득룡)'), true, '자기 릴리즈 결재 경고');
+eq(w.includes('릴리즈 결재(2026-11-26)가 완료일 이후'), true, '사후 결재 경고');
+
+p = planImport([v4({ releaseApproval: { status: 'APPROVED', approvers: [{ name: '추연우', decision: 'APPROVED', at: '2026-11-24 12:23' }, { name: '이광주', decision: 'APPROVED', at: '2026-11-24 12:26' }] } })], [], {});
+eq(p.add[0].warnings.some((x) => x.includes('전결권자')), false, '결재선에 C레벨이 한 명이라도 있으면 경고 없음');
+eq(p.add[0].entry.appr, '추연우, 이광주', '결재자 모두 기록');
+
+/* 실제 데이터에서 본 형태 */
+const real = v4({ projects: [{ code: 'P20', tasks: 5, tasksDone: 5 }], items: [
+  T('T30', { project: 'P20', title: '(개발) 기능', type: '프로젝트 개발' }),
+  T('T31', { project: 'P20', parent: 'T30', phase: '(개발) 기능', title: '기능 테스트', assignee: '기효선' }),
+  T('T32', { project: 'P20', parent: 'T30', phase: '(개발) 기능', title: '화면 개발', assignee: '김민정' }),
+  T('T33', { project: 'P20', title: '(검토) 기능', type: '프로젝트 테스트' }),
+  T('T34', { project: 'P20', parent: 'T33', phase: '(검토) 기능', title: 'QC', type: 'QA테스트', menu: 'QA_REVIEW', assignee: '김홍현' }),
+  T('T40', { title: '[표절검사] 배치 지연 장애', type: '장애', menu: 'INCIDENT', assignee: '박명규', requester: '박명규', completer: '박명규' }),
+  T('T41', { title: '보안서약 문구 추가', assignee: '김민정', requester: '김재현', completer: '김재현' }),
+  T('T42', { parent: 'T9999', phase: '[몬스터] 상위 일감', title: '평가 플랜 조정', assignee: '송재한', requester: '송재한', completer: '송재한' }),
+] });
+p = planImport([real], [], {}); w = p.add[0].warnings; en = p.add[0].entry;
+eq(en.dev, '김민정, 박명규, 송재한', '기능 테스트(기획자) 담당자는 개발자에서 뺌');
+eq(w.some((x) => x.startsWith('P20 QA 테스트')), false, '「QC」 이름의 QA 테스트도 유형으로 찾음');
+eq(w.some((x) => x.startsWith('P20 개발자 테스트')), false, '「기능 테스트」 를 개발자 테스트로 인정');
+eq(en.memo.includes('T40 [CO-01]'), true, '장애 일감은 CO-01');
+eq(w.some((x) => x.startsWith('T40 테스트')), false, '장애 일감에는 PC-01 테스트 경고를 걸지 않음');
+eq(w.includes('T41 테스트 결과 문서 없음 — 요청자 완료 확인만 있음 (PC-01 은 개발자 · 사용자 테스트 결과 필요)'), true, '요청자 완료 확인은 따로 표시');
+eq(en.id.includes('T42'), true, '상위 일감이 다른 릴리즈에 있으면 하위 일감이 증적 단위');
+eq(w.includes('T42 요청 · 개발 · 완료를 같은 사람(송재한)이 처리 — 독립 확인 없음'), true, '혼자 요청 · 개발 · 완료한 일감');
+
+const split = v4({ projects: [{ code: 'P30', tasks: 21, tasksDone: 21 }], items: [
+  T('T50', { project: 'P30', parent: 'T49', phase: '검토', title: '[결함] 미리보기 미적용', assignee: '박정규' }),
+] });
+p = planImport([split], [], {});
+eq(p.add[0].warnings.some((x) => x.startsWith('P30')), false, 'WBS 단계 일감이 다른 릴리즈에 있으면 경고하지 않음');
+eq(p.add[0].entry.memo.includes('P30 [PD-01] · WBS 단계 일감이 다른 릴리즈에 연결됨'), true, '다른 릴리즈에서 확인하라고 표시');
+
+p = planImport([v4({ releaseApproval: { status: 'NONE', approvers: [] } })], [], {});
+eq([p.add[0].entry.appr, p.add[0].entry.apprref], ['', ''], '결재가 없으면 승인자 · 승인 근거를 비움');
+
+const late = v4();
+late.items[0] = T('T1', { project: 'P10', title: '승인', type: '프로젝트 승인', assignee: '임팀장', completer: '임팀장', completedAt: '2026-11-30 23:59' });
+w = planImport([late], [], {}).add[0].warnings;
+eq(w.includes('P10 프로젝트 승인자 임팀장 은(는) 전결권자(C레벨) 아님'), true, '프로젝트 승인자 C레벨 확인');
+eq(w.includes('P10 프로젝트 승인(2026-11-30)이 배포 후'), true, '배포 후 프로젝트 승인 경고');
+eq(w.some((x) => x.includes('날짜 지정값(23:59)')), true, '23:59 승인 시각 경고');
+
+p = planImport([v4()], [{ k: 'x', task: 'R2001', id: 'P10' }], {});
+eq(p.exists[0].missing, ['T20', 'T21', 'T22', 'T23', 'T25'], '이미 있는 릴리즈는 대장에 없는 일감을 보여 줌');
+eq(planImport([rel({ approval: '승인' })], [], {}).add[0].entry.appr, undefined, '이전 추출 파일은 승인자를 채우지 않음');
+
 /* 프로젝트 없는 릴리즈 */
 p = planImport([rel({ tasks: 3 })], [], {});
 eq(p.add[0].entry.id, 'R2001', '프로젝트가 없으면 릴리즈 코드를 증적 ID 로');

@@ -41,8 +41,8 @@ eq(judge({ ...base, dev: ' 이개발 ', qa: '이개발' }).sod, 'bad', '공백 �
 eq(judge({ ...base, dev: '이개발', qa: '' }).sod, null, '한쪽이 비면 미판정');
 
 /* ── 승인 기록 ── */
-eq(judge({ ...base, appr: '최승인', apprd: '2026-08-14' }).appr, 'ok', '승인자+승인일 완비');
-eq(judge({ ...base, appr: '최승인', apprd: '' }).appr, 'bad', '승인일 누락은 미완비');
+eq(judge({ ...base, appr: '김경수', apprd: '2026-08-14' }).appr, 'ok', '승인자+승인일 완비');
+eq(judge({ ...base, appr: '김경수', apprd: '' }).appr, 'bad', '승인일 누락은 미완비');
 eq(judge({ ...base, appr: '', apprd: '2026-08-14' }).appr, 'bad', '승인자 누락은 미완비');
 
 /* ── 증적 매핑 ── */
@@ -81,7 +81,7 @@ eq(judge({ date: '', type: '수시', id: 'QA-20260814-01' }).idc, null, '배포�
 /* ── 종합 판정 ── */
 const clean = {
   date: '2026-08-14', type: '수시', id: 'QA-A-20260814-01', judge: '김판정',
-  dev: '이개발', qa: '박검증', appr: '최승인', apprd: '2026-08-14',
+  dev: '이개발', qa: '박검증', appr: '김경수', apprd: '2026-08-14',
   schema: '없음', int: '', intby: '', reg: '2026-08-19', state: '등록완료',
   /* 보고서 V2 대응 항목 */
   vdate: '2026-08-14', qav: '통과', qajudge: '박검증', qajd: '2026-08-14',
@@ -164,7 +164,7 @@ eq(judge({ ...clean, dev: '개발 22명 · 배포 PR #123', qa: '최우석, 김�
   '정규 표기(개발 N명 · 배포 PR) 는 겹침 없음 — 확인 결과는 비고에 남김');
 
 /* ── 배포 승인: 사후 승인 · 자기 승인 ── */
-const dep = { ...clean, date: '2026-09-30', type: '정규', appr: '김결재', apprd: '2026-09-30', dev: '이개발', deployer: '김인프라' };
+const dep = { ...clean, date: '2026-09-30', type: '정규', appr: '신동호', apprd: '2026-09-30', dev: '이개발', deployer: '김인프라' };
 eq(judge(dep).appr, 'ok', '배포일 당일 승인은 완비');
 eq(judge({ ...dep, apprd: '2026-09-29' }).appr, 'ok', '배포 전 승인은 완비');
 eq(judge({ ...dep, apprd: '2026-10-01' }).appr, 'bad', '배포 후 승인은 미완비 (정규)');
@@ -173,6 +173,10 @@ eq(judge({ ...dep, type: '핫픽스', apprd: '2026-10-01', memo: '' }).appr, 'ba
 eq(judge({ ...dep, type: '핫픽스', apprd: '2026-10-01', memo: '장애 긴급 조치 후 승인' }).appr, 'ok', '핫픽스 사후 승인 + 사유는 완비');
 eq(judge({ ...dep, appr: '이개발' }).appr, 'bad', '변경 작성자가 자기 배포를 승인하면 미완비');
 eq(judge({ ...dep, dev: '이개발, 박개발', appr: '박개발' }).appr, 'bad', '여러 개발자 중 한 명이 승인해도 미완비');
+eq(judge({ ...dep, appr: '임수경' }).appr, 'bad', '전결권자(C레벨)가 아닌 사람의 승인은 미완비');
+eq(judge({ ...dep, appr: '추연우, 이광주' }).appr, 'ok', '결재선에 전결권자가 한 명이라도 있으면 완비');
+eq(judge({ ...dep, appr: '이광주, 김희수' }).appr, 'ok', '전결권자 여러 명 승인은 완비');
+eq(judge({ ...dep, appr: '김경수(릴리즈 결재)' }).appr, 'ok', '괄호 설명은 이름 비교에서 뺌');
 
 /* ── 배포 수행자 ── */
 eq(judge(dep).dep, 'ok', '배포 수행자 기재');
