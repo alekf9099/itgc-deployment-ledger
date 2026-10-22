@@ -1,5 +1,5 @@
 /**
- * 워크플로우 가져오기 계획 검증
+ * 소프트팩토리 가져오기 계획 검증
  *   node scripts/test-workflow.mjs
  */
 import { planImport, normalizeRelease, targetSystem } from '../lib/workflow.js';
@@ -32,9 +32,9 @@ eq(p.add[0].warnings.some((w) => w.includes('P11')), true, '일감 없이 연결
 eq(e.type, '정규', '유형 그대로');
 
 /* 대장 항목 매핑 */
-eq(e.rel, '[몬스터] 11월 정기 릴리즈', '릴리즈명 = 워크플로우 제목');
+eq(e.rel, '[몬스터] 11월 정기 릴리즈', '릴리즈명 = 소프트팩토리 제목');
 eq(e.plan, '2026-11-25', '릴리즈 계획일 = 목표일');
-eq(e.apprref, '워크플로우 R2001 릴리즈 결재 https://flow.muhayu.com/releases/R2001', '결재 승인 건은 배포 승인 근거에 결재 링크');
+eq(e.apprref, '소프트팩토리 R2001 릴리즈 결재 https://sofac.muhayu.com/releases/R2001', '결재 승인 건은 배포 승인 근거에 결재 링크');
 eq(e.memo.includes('릴리즈 담당자 이득룡'), true, '비고에 릴리즈 담당자');
 eq(e.sys, 'HR몬스터', '태그가 워크스페이스에 들어 있으면 워크스페이스 표기');
 eq(targetSystem('CK캠퍼스', '[카피킬러] 2026/10/06 12시 핫픽스'), '카피킬러', '여러 서비스 워크스페이스는 제목 태그의 서비스');
@@ -43,7 +43,7 @@ eq(targetSystem('무하유', '2026년 10월 8일 공방 업데이트'), '무하�
 p = planImport([rel({ approval: '없음' })], [], {});
 eq(p.add[0].entry.apprref, '', '결재가 없으면 배포 승인 근거를 비워 둠');
 p = planImport([rel({ title: '[CK신디] 수시 릴리즈 요청서', type: '정규' })], [], {});
-eq(p.add[0].warnings.includes('제목은 수시, 워크플로우 유형은 정규 — 유형 확인'), true, '제목과 유형이 다르면 경고');
+eq(p.add[0].warnings.includes('제목은 수시, 소프트팩토리 유형은 정규 — 유형 확인'), true, '제목과 유형이 다르면 경고');
 p = planImport([rel({ title: '2026/10 [신디] 릴리즈', type: '정규' })], [], {});
 eq(p.add[0].warnings.some((w) => w.includes('유형 확인')), false, '제목에 유형이 없으면 경고 없음');
 
@@ -61,10 +61,10 @@ eq(p.add[0].warnings.includes('릴리즈 결재 없음'), true, '결재 없음 �
 eq(p.add[0].warnings.some((w) => w.startsWith('목표일 2026-11-20')), true, '목표일 ≠ 완료일 경고');
 
 /* 이미 대장에 있는 릴리즈 */
-const ledger = [{ k: 'x', task: '워크플로우 #R2001', id: 'QA-20261124-01' }];
+const ledger = [{ k: 'x', task: '소프트팩토리 #R2001', id: 'QA-20261124-01' }];
 p = planImport([rel({ projects: [{ code: 'P10', tasks: 5, tasksDone: 5 }] })], ledger, {});
 eq(p.add.length, 0, '식별자에 같은 R코드가 있으면 새로 만들지 않음');
-eq(p.exists[0].missing, ['P10'], '대장에 없는 워크플로우 프로젝트를 보여 줌');
+eq(p.exists[0].missing, ['P10'], '대장에 없는 소프트팩토리 프로젝트를 보여 줌');
 p = planImport([rel()], [{ k: 'y', task: '', id: 'R2001' }], {});
 eq(p.exists.length, 1, '증적 ID 에 R코드가 있어도 이미 있는 것으로 봄');
 
@@ -93,8 +93,8 @@ eq(normalizeRelease({ code: 'R1', title: 't', completed: '2026/09/01' }).bad.inc
 eq(normalizeRelease({ code: 'R1', title: 't', projects: [{ code: 'Q1' }, { code: 'P5', tasks: '3' }] }).release.projects.map((x) => x.code), ['P5'], '프로젝트 코드가 아닌 값은 버림');
 
 if (fails.length) {
-  console.error(`워크플로우 가져오기 검증 실패 — ${pass}건 통과, ${fails.length}건 실패\n`);
+  console.error(`소프트팩토리 가져오기 검증 실패 — ${pass}건 통과, ${fails.length}건 실패\n`);
   fails.forEach((f) => console.error(`  - ${f}`));
   process.exit(1);
 }
-console.log(`워크플로우 가져오기 검증 통과 · ${pass}건`);
+console.log(`소프트팩토리 가져오기 검증 통과 · ${pass}건`);

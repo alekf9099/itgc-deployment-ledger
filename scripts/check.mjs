@@ -47,11 +47,11 @@ scripts.forEach((src, i) => {
   }
 });
 
-/* 2-2. 워크플로우 추출 북마크 문법
+/* 2-2. 소프트팩토리 추출 북마크 문법
    type="text/plain" 이라 위 검사에 잡히지 않습니다. 문법 오류가 있으면 사용자가
-   워크플로우에서 눌렀을 때 아무 반응 없이 끝나므로 따로 검사합니다. */
+   소프트팩토리에서 눌렀을 때 아무 반응 없이 끝나므로 따로 검사합니다. */
 const bm = html.match(/<script type="text\/plain" id="wfBookmarkletSrc">([\s\S]*?)<\/script>/);
-if (!bm) fail.push('워크플로우 추출 북마크 원본(wfBookmarkletSrc)을 찾지 못했습니다');
+if (!bm) fail.push('소프트팩토리 추출 북마크 원본(wfBookmarkletSrc)을 찾지 못했습니다');
 else {
   const f = join(dir, 'bookmarklet.js');
   writeFileSync(f, bm[1]);

@@ -185,7 +185,7 @@ const dd = computeSummary([dep, { ...dep, id: 'QA-20260930-02', deployer: '이�
 eq(dd.items.find((i) => i.key === 'devdeploy').n, 1, '확인 항목: 개발자 직접 배포 1건');
 eq(dd.items.find((i) => i.key === 'devdeploy').isDef, false, '개발자 직접 배포는 지적이 아닌 확인 항목');
 
-/* ── 워크플로우 코드 (v2.22.0) ── */
+/* ── 소프트팩토리 코드 (v2.22.0) ── */
 const wf = { ...clean, date: '2026-10-07', vdate: '2026-10-05', type: '정규', task: 'R1052' };
 eq(judge({ ...wf, id: 'R1052' }).idc, 'ok', '릴리즈 코드');
 eq(judge({ ...wf, id: 'P953' }).idc, 'ok', '프로젝트 코드');
@@ -194,7 +194,7 @@ eq(judge({ ...wf, id: 'P953, P1102, P1166-02' }).idc, 'ok', '여러 프로젝트
 eq(judge({ ...wf, id: 'P953, QA-20261001-01' }).idc, 'ok', '코드와 QA 번호 혼용 (QA 번호 날짜 ≤ 검증 완료일)');
 eq(judge({ ...wf, id: 'P953, QA-20261006-01' }).idc, 'bad', '혼용 시에도 QA 번호가 검증 완료일보다 늦으면 불일치');
 eq(judge({ ...wf, id: 'R1003' }).idc, 'bad', '식별자(R1052)와 다른 릴리즈 코드는 불일치');
-eq(judge({ ...wf, task: '워크플로우 #R1052', id: 'R1052' }).idc, 'ok', '식별자 문장 안의 릴리즈 코드도 인식');
+eq(judge({ ...wf, task: '소프트팩토리 #R1052', id: 'R1052' }).idc, 'ok', '식별자 문장 안의 릴리즈 코드도 인식');
 eq(judge({ ...wf, task: 'COW #20163', id: 'R1003' }).idc, 'ok', '식별자에 릴리즈 코드가 없으면 대조하지 않음');
 eq(judge({ ...wf, id: 'R1052, R1052' }).idc, 'bad', '같은 코드 반복');
 eq(judge({ ...wf, id: 'P953-2' }).idc, 'bad', '회차는 두 자리');
