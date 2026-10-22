@@ -1,14 +1,14 @@
 /**
- * 워크플로우 릴리즈 가져오기
+ * 소프트팩토리 릴리즈 가져오기
  *
  *   POST /api/workflow-import { mode: 'preview', data, from }   계획만 계산
  *   POST /api/workflow-import { mode: 'apply',   data, from }   새 건 생성
  *
- * data 는 워크플로우에서 추출한 릴리즈 목록 파일입니다
+ * data 는 소프트팩토리에서 추출한 릴리즈 목록 파일입니다
  * ({ source, extractedAt, extractedBy, criteria, releases: [...] }).
  *
- * 워크플로우 API 토큰이 발급되면 같은 계획 · 적용 단계를 그대로 쓰고, 파일 대신
- * 서버가 워크플로우에서 직접 받아오도록 바꿉니다(WORKFLOW_API_TOKEN).
+ * 소프트팩토리 API 토큰이 발급되면 같은 계획 · 적용 단계를 그대로 쓰고, 파일 대신
+ * 서버가 소프트팩토리에서 직접 받아오도록 바꿉니다(WORKFLOW_API_TOKEN).
  *
  * 적용 시 계획을 서버에서 다시 계산합니다. 화면이 보낸 계획을 그대로 저장하면
  * 화면에서 값을 바꿔 보낼 수 있습니다.
@@ -100,7 +100,7 @@ export default async function handler(req, res) {
         `INSERT INTO audit_log (actor, actor_name, action, target, changed, note)
          VALUES ($1, $2, 'entry.create', $3, $4, $5)`,
         [user.username, user.name, e.k, JSON.stringify({ 등록: ['', e.id] }),
-         `워크플로우 ${item.code} 가져옴`]
+         `소프트팩토리 ${item.code} 가져옴`]
       );
     }
   });
@@ -108,7 +108,7 @@ export default async function handler(req, res) {
   /* 가져오기 자체를 한 줄로 남깁니다. 감사에서 "모집단을 언제, 누가, 어디서,
      어떤 기준으로 뽑았나"에 답하는 기록입니다. */
   await audit(user, 'workflow.import', null, null,
-    `${source.source || '워크플로우'} · 추출 ${source.extractedAt || '미상'} (${source.extractedBy || '미상'}) · ` +
+    `${source.source || '소프트팩토리'} · 추출 ${source.extractedAt || '미상'} (${source.extractedBy || '미상'}) · ` +
     `기준 ${source.criteria || from || '미상'} · 생성 ${created.length}건 · 제외 ${skipped.length}건`);
 
   return res.status(200).json({ created, skipped });

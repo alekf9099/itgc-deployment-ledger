@@ -411,7 +411,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn ghost" id="exp">CSV 내보내기</button>
-        <button class="btn ghost" id="wfOpen" title="워크플로우의 완료 릴리즈를 대장으로 가져옵니다">워크플로우 가져오기</button>
+        <button class="btn ghost" id="wfOpen" title="소프트팩토리의 완료 릴리즈를 대장으로 가져옵니다">소프트팩토리 가져오기</button>
         <button class="btn" id="add">배포 건 추가</button>
       </div>
     </div>
@@ -725,11 +725,11 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
   </form>
 </div>
 
-<!-- 워크플로우 추출 북마크 원본. 화면에서 javascript: 주소로 만들어 씁니다. 실행은 워크플로우 화면에서만 됩니다. -->
+<!-- 소프트팩토리 추출 북마크 원본. 화면에서 javascript: 주소로 만들어 씁니다. 실행은 소프트팩토리 화면에서만 됩니다. -->
 <script type="text/plain" id="wfBookmarkletSrc">
 (async () => {
   const VER = '3';
-  if (!/(^|\.)flow\.muhayu\.com$/.test(location.hostname)) { alert('워크플로우(flow.muhayu.com) 화면에서 실행하십시오.'); return; }
+  if (!/(^|\.)(sofac|flow)\.muhayu\.com$/.test(location.hostname)) { alert('소프트팩토리(sofac.muhayu.com) 화면에서 실행하십시오.'); return; }
   if (window.__wfExtracting) { alert('이미 추출 중입니다.'); return; }
   window.__wfExtracting = true;
   const pad = (n) => String(n).padStart(2, '0');
@@ -742,7 +742,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
   const ui = document.createElement('div');
   ui.style.cssText = 'position:fixed;right:18px;bottom:18px;z-index:2147483647;background:#111827;color:#fff;font:13px/1.5 sans-serif;padding:12px 16px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.3);max-width:360px';
   document.body.appendChild(ui);
-  const say = (t) => { ui.textContent = '워크플로우 추출 · ' + t; };
+  const say = (t) => { ui.textContent = '소프트팩토리 추출 · ' + t; };
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const go = (path) => { history.pushState({}, '', path); dispatchEvent(new PopStateEvent('popstate', { state: {} })); };
 
@@ -815,7 +815,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
       const c = cap[r.code] || {};
       r.projects = (c.projects?.items || []).map((p) => ({ code: p.id, name: p.name, tasks: p.taskCount || 0, tasksDone: p.completedTaskCount || 0 }));
       r.notes = [];
-      if (!c.projects) r.notes.push('릴리즈 구성 조회 실패 — 워크플로우에서 직접 확인');
+      if (!c.projects) r.notes.push('릴리즈 구성 조회 실패 — 소프트팩토리에서 직접 확인');
       for (const e of (c['audit-events']?.items || []).slice().reverse()) {
         let p = {}; try { p = JSON.parse(e.payload); } catch (x) {}
         const ch = (p.changes || [])[0] || {};
@@ -830,8 +830,8 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
     go('/releases?jql=');
 
     const out = {
-      source: 'flow.muhayu.com', extractor: `추출 북마크 v${VER}`, extractedAt: today,
-      extractedBy: '추출 북마크 (워크플로우 로그인 사용자)',
+      source: 'sofac.muhayu.com', extractor: `추출 북마크 v${VER}`, extractedAt: today,
+      extractedBy: '추출 북마크 (소프트팩토리 로그인 사용자)',
       method: `릴리즈 목록 ${page}페이지 + 대상 릴리즈 ${targets.length}건의 릴리즈 구성 · 변경 이력 조회 (조회 전용)`,
       criteria: `상태 완료 · 완료일 ${from} 이후 (예정 상태로 목표일이 지난 건은 확인용으로 함께 포함)`,
       releases: [...targets, ...pending.map((r) => ({ ...r, projects: [], notes: [] }))],
@@ -847,7 +847,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
   } catch (e) {
     restore();
     say('실패 · ' + (e.message || e));
-    alert('워크플로우 추출을 멈췄습니다.' + String.fromCharCode(10, 10) + (e.message || e));
+    alert('소프트팩토리 추출을 멈췄습니다.' + String.fromCharCode(10, 10) + (e.message || e));
     setTimeout(() => ui.remove(), 8000);
   }
 })();
@@ -855,23 +855,23 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 </script>
 <div class="modal" id="wfModal">
   <form id="wfForm" onsubmit="return false">
-    <h2>워크플로우 가져오기</h2>
-    <p class="m">워크플로우의 <b>완료</b> 릴리즈를 대장의 배포 건으로 가져옵니다. 이미 대장에 있는 릴리즈(R코드)는 건드리지 않고,
+    <h2>소프트팩토리 가져오기</h2>
+    <p class="m">소프트팩토리의 <b>완료</b> 릴리즈를 대장의 배포 건으로 가져옵니다. 이미 대장에 있는 릴리즈(R코드)는 건드리지 않고,
       새 건은 「작성중」으로 만들어집니다. 완료일은 배포일 후보이며 실제 배포일은 확인 후 고칩니다.</p>
     <div class="err" id="wfErr"></div>
     <details class="wfbm" id="wfBmBox">
       <summary>추출 파일 만들기 — 추출 북마크</summary>
       <ol>
-        <li>아래 <b>「워크플로우 추출」</b> 버튼을 브라우저 <b>즐겨찾기 막대로 끌어다 놓습니다</b> (처음 한 번만).
+        <li>아래 <b>「소프트팩토리 추출」</b> 버튼을 브라우저 <b>즐겨찾기 막대로 끌어다 놓습니다</b> (처음 한 번만).
           끌어 놓기가 안 되면 「코드 복사」로 새 즐겨찾기를 만들고 주소 칸에 붙여 넣습니다.</li>
-        <li>워크플로우에 로그인한 상태로 <b>릴리즈 화면</b>을 엽니다.</li>
-        <li>즐겨찾기의 「워크플로우 추출」을 누르고 시작일을 입력합니다. 끝나면 <code>workflow-releases-날짜.json</code> 이 저장됩니다.</li>
+        <li>소프트팩토리에 로그인한 상태로 <b>릴리즈 화면</b>을 엽니다.</li>
+        <li>즐겨찾기의 「소프트팩토리 추출」을 누르고 시작일을 입력합니다. 끝나면 <code>workflow-releases-날짜.json</code> 이 저장됩니다.</li>
         <li>이 창에서 그 파일을 고르고 미리보기 → 가져오기.</li>
       </ol>
-      <div class="bmrow"><a class="btn" id="wfBm" href="#" title="즐겨찾기 막대로 끌어다 놓으십시오">워크플로우 추출</a>
+      <div class="bmrow"><a class="btn" id="wfBm" href="#" title="즐겨찾기 막대로 끌어다 놓으십시오">소프트팩토리 추출</a>
         <button type="button" class="btn ghost" id="wfBmCopy">코드 복사</button></div>
-      <p class="hint">워크플로우 화면이 스스로 불러오는 데이터만 읽습니다. 로그인 정보를 꺼내거나 다른 곳에 보내지 않고, 워크플로우에 아무것도 쓰지 않습니다.
-        워크플로우 화면 구조가 바뀌면 북마크도 갱신해야 합니다(이 창에서 다시 끌어 놓기).</p>
+      <p class="hint">소프트팩토리 화면이 스스로 불러오는 데이터만 읽습니다. 로그인 정보를 꺼내거나 다른 곳에 보내지 않고, 소프트팩토리에 아무것도 쓰지 않습니다.
+        소프트팩토리 화면 구조가 바뀌면 북마크도 갱신해야 합니다(이 창에서 다시 끌어 놓기).</p>
     </details>
     <div class="row">
       <label class="f"><span>추출 파일 (.json)</span><input type="file" id="wfFile" accept=".json,application/json"></label>
@@ -930,14 +930,14 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
       </div>
       <div class="row one">
         <label class="f"><span>일감 / 릴리즈 식별자</span><input type="text" id="f_task" placeholder="R1003 · COW #20163">
-          <div class="hint">정규는 워크플로우 릴리즈 번호(R1003), 수시는 COW 번호, 핫픽스는 조치 내용 요약.</div></label>
+          <div class="hint">정규는 소프트팩토리 릴리즈 번호(R1003), 수시는 COW 번호, 핫픽스는 조치 내용 요약.</div></label>
       </div>
     </fieldset>
     <fieldset class="fs"><legend>증적</legend>
       <div class="row one">
         <label class="f"><span>증적 문서 ID<em>*</em></span>
-          <div class="withbtn"><input type="text" id="f_id" placeholder="R1052 · P953, P1166"><button type="button" class="mini" id="idAdd" title="워크플로우 코드가 없는 배포에 QA 번호(QA-YYYYMMDD-NN)를 붙입니다">+ QA 번호</button></div>
-          <div class="hint" id="idHint">보고서의 증적 문서 ID 를 적습니다. 워크플로우 코드(R1052 · P953 · T2886)를 쓰며, 식별자에 코드가 있으면 자동으로 채워집니다.</div>
+          <div class="withbtn"><input type="text" id="f_id" placeholder="R1052 · P953, P1166"><button type="button" class="mini" id="idAdd" title="소프트팩토리 코드가 없는 배포에 QA 번호(QA-YYYYMMDD-NN)를 붙입니다">+ QA 번호</button></div>
+          <div class="hint" id="idHint">보고서의 증적 문서 ID 를 적습니다. 소프트팩토리 코드(R1052 · P953 · T2886)를 쓰며, 식별자에 코드가 있으면 자동으로 채워집니다.</div>
           <div class="hint">프로젝트 보고서가 여러 개면 <b>모두</b> 적습니다 (예: P953, P1102). 같은 대상을 다시 검증했으면 P953-02. 코드가 없는 배포는 「+ QA 번호」.</div></label>
       </div>
       <div class="row">
@@ -1010,7 +1010,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.27.0';
+const APP_VERSION='2.28.0';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
@@ -1043,7 +1043,7 @@ const CODE={'정규':'R','수시':'A','핫픽스':'E'};
 /**
  * 증적 문서 ID 형식
  *
- * 기본은 워크플로우 코드(R1052 · P953 · T2886, 재검증 P953-02)입니다 (v2.22.0).
+ * 기본은 소프트팩토리 코드(R1052 · P953 · T2886, 재검증 P953-02)입니다 (v2.22.0).
  * 코드가 없는 배포는 QA-{검증 완료일 YYYYMMDD}-{일련 2자리} 를 쓰며, 이 형식만
  * 날짜부를 검증 완료일과 대조합니다. 유형은 ID 가 아니라 「릴리즈 구분」으로 관리합니다.
  *
@@ -1056,7 +1056,7 @@ const ID_CURRENT=/^QA-(\d{8})-(\d{2,})$/, ID_LEGACY=/^QA-([RAE])-(\d{8})-(\d{2,}
    서버(lib/judge.js)와 같은 규칙입니다. */
 const splitDocIds=s=>String(s??'').split(/[\s,，、]+/).map(x=>x.trim()).filter(Boolean);
 const splitNames=s=>String(s??'').split(/[,，、/·]+/).map(x=>x.trim()).filter(Boolean);
-/* 워크플로우 코드(v2.22.0 부터 기본): R 릴리즈 · P 프로젝트 · T 일감, 재검증은 -02 */
+/* 소프트팩토리 코드(v2.22.0 부터 기본): R 릴리즈 · P 프로젝트 · T 일감, 재검증은 -02 */
 const ID_WORKFLOW=/^([RPT])(\d{3,})(?:-(\d{2}))?$/;
 const releaseCodes=s=>[...String(s??'').matchAll(/(?<![A-Za-z0-9])R(\d{3,})(?![0-9])/g)].map(m=>`R${m[1]}`);
 const workflowCodes=s=>[...String(s??'').matchAll(/(?<![A-Za-z0-9])([RPT])(\d{3,})(?![0-9])/g)].map(m=>`${m[1]}${m[2]}`);
@@ -1150,7 +1150,7 @@ function judge(r){
     const otherR=ids.filter((x,n)=>ps[n]&&ps[n].kind==='wf'&&ps[n].prefix==='R'&&taskR.length&&!taskR.includes(ps[n].ref));
     const late=qaIdx.filter(n=>ps[n].date>b).map(n=>ids[n]);
     const codeBad=qaIdx.filter(n=>ps[n].code&&(!r.type||ps[n].code!==CODE[r.type])).map(n=>ids[n]);
-    if(badFmt.length) bad('idc',`${badFmt.join(', ')} 은(는) ID 형식이 아닙니다. 워크플로우 코드(R1052 · P953 · T2886, 재검증은 P953-02) 또는 QA-YYYYMMDD-01 로 적으십시오.`);
+    if(badFmt.length) bad('idc',`${badFmt.join(', ')} 은(는) ID 형식이 아닙니다. 소프트팩토리 코드(R1052 · P953 · T2886, 재검증은 P953-02) 또는 QA-YYYYMMDD-01 로 적으십시오.`);
     else if(dup.length) bad('idc',`${[...new Set(dup)].join(', ')} 이(가) 두 번 적혀 있습니다.`);
     else if(otherR.length) bad('idc',`${otherR.join(', ')} 은(는) 일감/릴리즈 식별자(${taskR.join(', ')})와 다른 릴리즈입니다. 어느 쪽이 맞는지 확인하십시오.`);
     else if(late.length) bad('idc',`${late.join(', ')} 의 날짜가 ${baseName}(${base})보다 늦습니다. ID 날짜는 그 보고서의 검증 완료일입니다.`);
@@ -1345,7 +1345,7 @@ const WHY_FIELD={term:'f_reg',sod:'f_qa',appr:'f_apprd',dep:'f_deployer',map:'f_
 let idAuto=false;
 
 function autoId(){
-  /* 증적 문서 ID 는 워크플로우 코드를 씁니다(v2.22.0). 일감/릴리즈 식별자에
+  /* 증적 문서 ID 는 소프트팩토리 코드를 씁니다(v2.22.0). 일감/릴리즈 식별자에
      R1052 · P953 같은 코드가 있으면 그 값으로 채웁니다. 프로젝트 보고서가 따로
      있으면 그 P 코드로 바꿔 적습니다.
      이미 부여된 ID 는 바꾸지 않습니다. 신규 등록에서, 담당자가 ID 를 직접
@@ -1400,7 +1400,7 @@ function openDrawer(rec){
   idAuto=!rec;
   $('idHint').textContent=rec
     ? '이미 부여된 ID 는 자동으로 바뀌지 않습니다. 보고서의 증적 문서 ID 와 같은지 확인하십시오.'
-    : '보고서의 증적 문서 ID 를 적습니다. 워크플로우 코드(R1052 · P953 · T2886)를 쓰며, 식별자에 코드가 있으면 자동으로 채워집니다.';
+    : '보고서의 증적 문서 ID 를 적습니다. 소프트팩토리 코드(R1052 · P953 · T2886)를 쓰며, 식별자에 코드가 있으면 자동으로 채워집니다.';
 
   const carried=[];
   if(!rec&&!ro){
@@ -1440,8 +1440,8 @@ const TIPS={
   f_type:{t:'정규 / 수시 / 핫픽스 중 하나.',ex:'정규',w:'DB 변경, 권한·과금 로직, 외부 연동 규격, 신규 화면·기능, 여러 일감 묶음 배포 중 하나라도 있으면 일감 수와 관계없이 정규입니다.'},
   f_sys:{t:'배포가 반영된 서비스입니다.',ex:'HR 몬스터',w:'같은 시스템은 매번 같은 표기로 적습니다. 이전에 쓴 값이 자동완성으로 나옵니다.'},
   f_judge:{t:'정규·수시·핫픽스를 정한 사람입니다. 보통 릴리즈를 만든 사람이나 PM입니다.',ex:'이득룡',w:'QA 판정(통과·실패)을 적는 칸이 아닙니다. 유형에 따라 필요한 증적이 달라, 유형을 정한 책임자를 남기는 칸입니다.'},
-  f_task:{t:'워크플로우 릴리즈 코드나 일감 번호입니다.',ex:'정규 R1052 · 수시 COW #20163 · 핫픽스 조치 요약',w:'코드를 넣으면 증적 문서 ID 가 자동으로 채워집니다.'},
-  f_id:{t:'QA 완료 보고서의 증적 문서 ID 입니다. 워크플로우 코드를 씁니다.',ex:'R1052 / P953, P1102 / 재검증 P953-02',w:'배포된 프로젝트의 보고서 ID 를 모두 적습니다. 다른 배포 건에 이미 있는 ID 는 저장되지 않습니다. 코드가 없는 배포는 「+ QA 번호」.'},
+  f_task:{t:'소프트팩토리 릴리즈 코드나 일감 번호입니다.',ex:'정규 R1052 · 수시 COW #20163 · 핫픽스 조치 요약',w:'코드를 넣으면 증적 문서 ID 가 자동으로 채워집니다.'},
+  f_id:{t:'QA 완료 보고서의 증적 문서 ID 입니다. 소프트팩토리 코드를 씁니다.',ex:'R1052 / P953, P1102 / 재검증 P953-02',w:'배포된 프로젝트의 보고서 ID 를 모두 적습니다. 다른 배포 건에 이미 있는 ID 는 저장되지 않습니다. 코드가 없는 배포는 「+ QA 번호」.'},
   f_vdate:{t:'최종 회차 검증이 끝난 날입니다. 보고서의 「검증 완료 일시」.',ex:'2026-09-29',w:'보고서가 여러 개면 가장 늦은 날. 배포일보다 늦으면(사후 검증) 비고에 사유를 적습니다.'},
   f_reg:{t:'보고서를 아카이빙 채널(동사무소)에 등록한 날입니다.',ex:'2026-09-30',w:'기한: 정규는 배포일 당일, 수시는 +3영업일, 핫픽스는 +2영업일.'},
   f_dev:{t:'이번 배포에 코드를 넣은 개발자입니다.',ex:'박정규, 김민정, 이해령',w:'근거는 프로젝트 WBS 의 개발 단계 · 일감 담당자. 기획·PM, QA, 승인자는 넣지 않습니다. 이름을 적어야 직무 분리가 자동으로 판정됩니다.'},
@@ -1526,7 +1526,7 @@ async function loadEntryHist(rec){
     box.innerHTML=head+'<div style="color:var(--bad);margin-top:7px">이력을 불러오지 못했습니다.</div>';
   }
 }
-const ACT={'entry.create':'등록','entry.update':'수정','entry.delete':'삭제','workflow.import':'워크플로우 가져오기',
+const ACT={'entry.create':'등록','entry.update':'수정','entry.delete':'삭제','workflow.import':'소프트팩토리 가져오기',
   'check.save':'월간 점검 저장','check.delete':'월간 점검 삭제',
   'login':'로그인','login.fail':'로그인 실패','login.block':'로그인 차단','password.change':'비밀번호 변경',
   'user.create':'계정 발급','user.update':'계정 변경','user.reset':'비밀번호 재설정',
@@ -1635,17 +1635,17 @@ function fail(e){
 }
 
 /* 서버의 최신 대장으로 다시 맞춥니다. */
-/* ══════════════ 워크플로우 가져오기 ══════════════
+/* ══════════════ 소프트팩토리 가져오기 ══════════════
    추출 파일을 올려 미리보기 → 확인 → 적용합니다. 적용 시 서버가 계획을 다시
    계산하므로, 미리보기 이후 대장이 바뀌어도 중복 · 겹침은 서버가 막습니다.
-   워크플로우 API 토큰이 생기면 파일 대신 서버가 직접 받아오도록 바꿉니다. */
+   소프트팩토리 API 토큰이 생기면 파일 대신 서버가 직접 받아오도록 바꿉니다. */
 let WF=null;
 function wfReset(){ WF=null; $('wfPlan').innerHTML=''; $('wfSource').textContent=''; $('wfApply').disabled=true; $('wfApply').textContent='미리보기 후 가져오기'; $('wfErr').classList.remove('on'); }
 function wfErr(m){ $('wfErr').textContent=m; $('wfErr').classList.add('on'); }
 /* 추출 북마크 주소. 원본은 위 wfBookmarkletSrc 한 곳에만 둡니다. */
 const WF_BOOKMARKLET='javascript:'+encodeURIComponent($('wfBookmarkletSrc').textContent.trim());
 $('wfBm').href=WF_BOOKMARKLET;
-$('wfBm').onclick=e=>{ e.preventDefault(); toast('즐겨찾기 막대로 끌어다 놓으십시오. 실행은 워크플로우 화면에서 합니다'); };
+$('wfBm').onclick=e=>{ e.preventDefault(); toast('즐겨찾기 막대로 끌어다 놓으십시오. 실행은 소프트팩토리 화면에서 합니다'); };
 $('wfBmCopy').onclick=async()=>{
   try{ await navigator.clipboard.writeText(WF_BOOKMARKLET); toast('복사했습니다. 새 즐겨찾기의 주소 칸에 붙여 넣으십시오'); }
   catch(e){ prompt('아래 내용을 복사해 즐겨찾기 주소로 쓰십시오',WF_BOOKMARKLET); }
@@ -1671,8 +1671,8 @@ $('wfPreview').onclick=async()=>{
     $('wfPlan').innerHTML=`<div class="wfsum"><span class="add">새로 추가 ${plan.add.length}</span><span>이미 대장에 있음 ${plan.exists.length}</span>
         <span class="warn">완료 처리 전 (확인 필요) ${plan.pending.length}</span><span>기간 밖 ${plan.outOfRange.length}</span>${plan.invalid.length?`<span class="warn">파일 오류 ${plan.invalid.length}</span>`:''}</div>
       ${plan.add.length?`<div class="wfh">새로 추가</div><table class="wftbl"><thead><tr><th>릴리즈</th><th>제목 · 시스템</th><th>유형</th><th>완료일</th><th>증적 ID</th><th>상태</th><th>확인할 것</th></tr></thead><tbody>${plan.add.map(row).join('')}</tbody></table>`:''}
-      ${plan.exists.length?`<div class="wfh">이미 대장에 있음 (변경하지 않음)</div><table class="wftbl"><thead><tr><th>릴리즈</th><th>제목</th><th>대장 증적 ID</th><th>워크플로우 구성 중 대장에 없는 프로젝트</th></tr></thead><tbody>${plan.exists.map(e=>`<tr><td class="c">${esc(e.code)}</td><td>${esc(e.title)}</td><td class="c">${esc(e.ledgerId)}</td><td class="w">${esc(e.missing.join(', ')||'없음')}</td></tr>`).join('')}</tbody></table>`:''}
-      ${plan.pending.length?`<div class="wfh">완료 처리 전 — 실제로 배포됐다면 워크플로우에서 완료 처리 후 다시 가져오십시오</div><table class="wftbl"><thead><tr><th>릴리즈</th><th>제목</th><th>목표일</th><th>결재</th></tr></thead><tbody>${plan.pending.map(r=>`<tr><td class="c">${esc(r.code)}</td><td>${esc(r.title)}<div style="color:var(--ink-3)">${esc(r.ws)}</div></td><td class="c">${esc(r.target)}</td><td>${esc(r.approval)}</td></tr>`).join('')}</tbody></table>`:''}
+      ${plan.exists.length?`<div class="wfh">이미 대장에 있음 (변경하지 않음)</div><table class="wftbl"><thead><tr><th>릴리즈</th><th>제목</th><th>대장 증적 ID</th><th>소프트팩토리 구성 중 대장에 없는 프로젝트</th></tr></thead><tbody>${plan.exists.map(e=>`<tr><td class="c">${esc(e.code)}</td><td>${esc(e.title)}</td><td class="c">${esc(e.ledgerId)}</td><td class="w">${esc(e.missing.join(', ')||'없음')}</td></tr>`).join('')}</tbody></table>`:''}
+      ${plan.pending.length?`<div class="wfh">완료 처리 전 — 실제로 배포됐다면 소프트팩토리에서 완료 처리 후 다시 가져오십시오</div><table class="wftbl"><thead><tr><th>릴리즈</th><th>제목</th><th>목표일</th><th>결재</th></tr></thead><tbody>${plan.pending.map(r=>`<tr><td class="c">${esc(r.code)}</td><td>${esc(r.title)}<div style="color:var(--ink-3)">${esc(r.ws)}</div></td><td class="c">${esc(r.target)}</td><td>${esc(r.approval)}</td></tr>`).join('')}</tbody></table>`:''}
       ${plan.invalid.length?`<div class="wfh">파일 오류 — 가져오지 않음</div><table class="wftbl"><tbody>${plan.invalid.map(r=>`<tr><td class="c">${esc(r.code)}</td><td>${esc(r.title)}</td><td class="w">${esc(r.reason)}</td></tr>`).join('')}</tbody></table>`:''}`;
     $('wfApply').disabled=!plan.add.length;
     $('wfApply').textContent=plan.add.length?`${plan.add.length}건 가져오기`:'가져올 건 없음';
@@ -2040,7 +2040,7 @@ function queueDraft(){
 
 /* ══════════════ 기준 ══════════════ */
 const DEF_IN=[
- ['증적 문서 ID','보고서의 증적 문서 ID 를 그대로 적습니다. 워크플로우가 릴리즈 · 프로젝트 · 일감을 코드로 관리하므로 그 코드를 씁니다 (v2.22.0).\n· R1052 — 릴리즈 단위 보고서\n· P953 — 프로젝트 보고서\n· T2886 — 프로젝트가 없는 수시 · 핫픽스의 일감 단위 보고서\n· P953-02 — 같은 대상을 다시 검증한 보고서 (2회차). 같은 코드가 두 배포 건에 걸리지 않게 회차를 붙입니다\n워크플로우 코드가 없는 배포는 QA 번호(QA-YYYYMMDD-NN, 날짜는 검증 완료일)를 붙입니다. 이전에 QA 번호로 부여한 ID 도 그대로 유효합니다.\n릴리즈에 프로젝트 보고서가 여러 개면 배포된 프로젝트의 보고서 ID 를 모두 적습니다. 한 보고서 ID 는 한 배포 건에만 적을 수 있습니다.\n보고서 본문과 게시글 제목에 동일 ID 를 표기합니다. 제목 표기는 ID 로 증적을 검색하기 위한 필수 요건입니다.'],
+ ['증적 문서 ID','보고서의 증적 문서 ID 를 그대로 적습니다. 소프트팩토리가 릴리즈 · 프로젝트 · 일감을 코드로 관리하므로 그 코드를 씁니다 (v2.22.0).\n· R1052 — 릴리즈 단위 보고서\n· P953 — 프로젝트 보고서\n· T2886 — 프로젝트가 없는 수시 · 핫픽스의 일감 단위 보고서\n· P953-02 — 같은 대상을 다시 검증한 보고서 (2회차). 같은 코드가 두 배포 건에 걸리지 않게 회차를 붙입니다\n소프트팩토리 코드가 없는 배포는 QA 번호(QA-YYYYMMDD-NN, 날짜는 검증 완료일)를 붙입니다. 이전에 QA 번호로 부여한 ID 도 그대로 유효합니다.\n릴리즈에 프로젝트 보고서가 여러 개면 배포된 프로젝트의 보고서 ID 를 모두 적습니다. 한 보고서 ID 는 한 배포 건에만 적을 수 있습니다.\n보고서 본문과 게시글 제목에 동일 ID 를 표기합니다. 제목 표기는 ID 로 증적을 검색하기 위한 필수 요건입니다.'],
  ['배포일','실제 운영 반영일. 보고서의 「운영 배포 일시」와 같은 값입니다. 배포 이력(GitHub RELEASE 머지 PR)과 일치해야 합니다. 월간 점검의 집계 기준일이며, 배포 승인일 대조도 이 값을 기준으로 합니다.'],
  ['검증 완료일','최종 회차 검증 종료일. 보고서의 「검증 완료 일시」이자 4항 테스트 기간의 최종 회차 종료일과 같아야 합니다.\n보고서가 여러 개면 그중 가장 늦은 검증 완료일을 적습니다. 릴리즈 전체의 검증이 끝난 날입니다.\n증적 문서 ID 의 날짜부가 이 값을 따르므로 비워둘 수 없습니다.\n배포일보다 늦은 경우(사후 검증) 사유를 비고에 기재합니다. 사유가 없으면 「검증 완료일」 판정이 미비로 표기됩니다.'],
  ['릴리즈 구분','정규 / 수시 / 핫픽스를 배포 요청 시점에 판정합니다.\n다음 중 하나라도 해당하면 일감 건수와 무관하게 정규로 취급합니다 — DB 스키마 변경 또는 데이터 마이그레이션, 인증·권한·과금 로직 변경, 외부 연동 규격 변경, 신규 화면 또는 신규 기능 추가, 다수 일감 묶음 배포 또는 서비스 개편.'],
@@ -2067,7 +2067,7 @@ const DEF_FX=[
  ['배포 수행','배포 수행자가 있으면 기재, 없으면 미기재.'],
  ['증적 매핑','증적 문서 ID가 있으면 매핑완료, 없으면 매핑미완료. 증적 상태가 「해당없음」이면 해당없음.'],
  ['정합성 확인','스키마 변경 「해당」 + 검증 「완료」 + 검증자 기재 → 정상\n스키마 변경 「해당」 + 검증 「부적합」·「미실시」 또는 검증자 공란 → 비정상\n스키마 변경 「없음」 + 검증 공란 → 미해당\n스키마 변경 「없음」인데 검증값이 있으면 → 비정상 (기재 오류이며 월간 점검에서 입력 오류로 분리 집계)'],
- ['ID 정합성','다음이면 불일치입니다.\n· 워크플로우 코드(R · P · T)나 QA 번호 형식이 아님\n· 같은 ID 를 두 번 적음\n· ID 의 릴리즈 코드(R)가 일감/릴리즈 식별자의 릴리즈 코드와 다름 — 예: 식별자 R1003 인데 ID R1052\n· QA 번호의 날짜가 검증 완료일보다 늦음, 또는 ID 가 모두 QA 번호인데 검증 완료일과 같은 날짜가 없음\n워크플로우 코드에는 날짜가 없어 날짜 대조는 QA 번호에만 적용합니다. 검증 완료일 자체는 「검증 완료일」 판정이 따로 봅니다.'],
+ ['ID 정합성','다음이면 불일치입니다.\n· 소프트팩토리 코드(R · P · T)나 QA 번호 형식이 아님\n· 같은 ID 를 두 번 적음\n· ID 의 릴리즈 코드(R)가 일감/릴리즈 식별자의 릴리즈 코드와 다름 — 예: 식별자 R1003 인데 ID R1052\n· QA 번호의 날짜가 검증 완료일보다 늦음, 또는 ID 가 모두 QA 번호인데 검증 완료일과 같은 날짜가 없음\n소프트팩토리 코드에는 날짜가 없어 날짜 대조는 QA 번호에만 적용합니다. 검증 완료일 자체는 「검증 완료일」 판정이 따로 봅니다.'],
  ['검증 완료일 (판정)','검증 완료일이 있고 배포일 이전이면 정상.\n공란이면 미비 — 증적 문서 ID 의 기준일이므로 비워둘 수 없습니다.\n배포일보다 늦은데 비고가 비어 있으면 미비 — 사후 검증은 사유 기재가 요건입니다.'],
  ['QA 판정 적정성','미해결 보류 이슈(즉시·긴급·높음)가 1건 이상인데 판정이 「통과」이면 부적정, 그 외는 적정.\n보류 건수를 비워두면 이 대조는 하지 않습니다.'],
  ['요구사항 일치 (판정)','요구사항 일치 여부가 있으면 확인, 없으면 미확인.\n「불일치」인데 QA 판정이 「통과」이면 미확인 — 근거 없는 범위 이탈을 통과로 판정할 수 없습니다.'],
