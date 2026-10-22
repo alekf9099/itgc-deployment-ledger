@@ -74,7 +74,7 @@ eq(LEDGER_HEADER[27], '비고', '기존 마지막 열(비고)은 자리를 지�
 const clean = {
   id: 'QA-A-20260814-01', date: '2026-08-14', type: '수시', judge: '김판정',
   sys: '카피킬러', task: 'COW #20163', dev: '이개발', qa: '박검증', qav: '통과',
-  appr: '최승인', apprd: '2026-08-14', schema: '없음', int: '', intby: '',
+  appr: '김경수', apprd: '2026-08-14', schema: '없음', int: '', intby: '',
   reg: '2026-08-19', path: '게시판 > 릴리즈노트', state: '등록완료',
   exc: '', memo: '',
   vdate: '2026-08-14', qajudge: '박검증', qajd: '2026-08-14', deployer: '김인프라',
