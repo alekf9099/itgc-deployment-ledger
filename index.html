@@ -51,7 +51,7 @@ nav button[aria-current="true"] i{color:#5B8DEF}
 .navfoot{padding:12px 20px 0;border-top:1px solid rgba(255,255,255,.1);font-size:10.5px;color:#66768F;font-family:var(--mono);line-height:1.7}
 
 /* ─────────── layout ─────────── */
-main{padding:26px 30px 60px;max-width:1500px;overflow-x:hidden}
+main{padding:26px 30px 60px;min-width:0;overflow-x:hidden}
 .head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:6px}
 .head h1{font-size:23px}
 .sub{color:var(--ink-3);font-size:12.5px;margin:5px 0 22px;max-width:900px}
@@ -1034,7 +1034,7 @@ td.act button:hover{background:var(--line-2);color:var(--ink)}
 /* ══════════════ 버전 ══════════════ */
 /* 배포 시 이 값을 갱신합니다. 화면 좌하단에 표시되며, 어느 버전의 대장에서
    작성·판정된 기록인지 추적하기 위한 값입니다. */
-const APP_VERSION='2.29.0';
+const APP_VERSION='2.29.1';
 
 /* ══════════════ 서버 통신 ══════════════ */
 /* 대장 데이터는 서버 DB에 저장됩니다. 브라우저에는 아무것도 남기지 않으므로
